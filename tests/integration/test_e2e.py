@@ -756,3 +756,154 @@ class TestGracefulDegradation:
             assert tracker.last_call() is not None
             
             tracker.close()
+
+
+class TestResiliencePatterns:
+    """End-to-end tests for resilience patterns."""
+
+    def test_circuit_breaker_workflow(self):
+        """Test circuit breaker in realistic scenario."""
+        from llm_cost_guard import CircuitBreaker, CircuitState, CircuitOpenError
+        
+        breaker = CircuitBreaker(
+            failure_threshold=3,
+            timeout=0.1,
+            name="api-breaker",
+        )
+        
+        # Simulate failures
+        for _ in range(3):
+            breaker.record_failure()
+        
+        assert breaker.state == CircuitState.OPEN
+        
+        # Wait for half-open
+        import time
+        time.sleep(0.15)
+        
+        assert breaker.state == CircuitState.HALF_OPEN
+        
+        # Successful request closes circuit
+        breaker.record_success()
+        breaker.record_success()
+        
+        assert breaker.state == CircuitState.CLOSED
+
+    def test_retry_with_transient_failures(self):
+        """Test retry handles transient failures."""
+        from llm_cost_guard import retry_with_backoff
+        
+        call_count = 0
+        
+        @retry_with_backoff(max_attempts=3, initial_delay=0.01)
+        def flaky_api_call():
+            nonlocal call_count
+            call_count += 1
+            if call_count < 3:
+                raise ConnectionError("Transient failure")
+            return {"status": "success"}
+        
+        result = flaky_api_call()
+        
+        assert result == {"status": "success"}
+        assert call_count == 3
+
+
+class TestEncryptionWorkflow:
+    """End-to-end tests for encryption."""
+
+    def test_field_encryption_workflow(self):
+        """Test encrypting sensitive fields."""
+        from llm_cost_guard import NoEncryption, FieldEncryption
+        
+        # Use NoEncryption for testing (passthrough)
+        field_enc = FieldEncryption(
+            provider=NoEncryption(),
+            encrypted_fields=["metadata"],
+            hashed_fields=["user_id"],
+            hash_salt="test-salt",
+        )
+        
+        record = {
+            "model": "gpt-4o",
+            "cost": 0.05,
+            "metadata": {"prompt": "sensitive prompt"},
+            "user_id": "user@example.com",
+        }
+        
+        encrypted = field_enc.encrypt_record(record)
+        
+        # user_id should be hashed
+        assert encrypted["user_id"] != "user@example.com"
+        assert encrypted["_user_id_hashed"] is True
+        
+        # metadata marked as encrypted
+        assert encrypted["_metadata_encrypted"] is True
+        
+        # model and cost unchanged
+        assert encrypted["model"] == "gpt-4o"
+        assert encrypted["cost"] == 0.05
+
+    def test_fernet_encryption_workflow(self):
+        """Test Fernet encryption end-to-end."""
+        try:
+            from llm_cost_guard import FernetEncryption, FieldEncryption
+            
+            key = FernetEncryption.generate_key()
+            provider = FernetEncryption(key)
+            
+            field_enc = FieldEncryption(
+                provider=provider,
+                encrypted_fields=["tags"],
+            )
+            
+            record = {"tags": {"team": "search", "env": "prod"}}
+            
+            encrypted = field_enc.encrypt_record(record)
+            assert encrypted["tags"] != '{"team": "search", "env": "prod"}'
+            
+            decrypted = field_enc.decrypt_record(encrypted)
+            assert decrypted["tags"] == {"team": "search", "env": "prod"}
+        except ImportError:
+            pytest.skip("cryptography not installed")
+
+
+class TestSecretsWorkflow:
+    """End-to-end tests for secrets management."""
+
+    def test_environment_secrets_workflow(self):
+        """Test environment-based secrets."""
+        import os
+        from llm_cost_guard import EnvironmentSecretsProvider
+        
+        with patch.dict(os.environ, {"LLM_REDIS_URL": "redis://secret:6379"}):
+            provider = EnvironmentSecretsProvider(prefix="LLM_")
+            
+            url = provider.get_secret("REDIS_URL")
+            
+            assert url == "redis://secret:6379"
+
+    def test_composite_secrets_fallback(self):
+        """Test composite provider with fallback."""
+        import os
+        import tempfile
+        from llm_cost_guard.secrets import (
+            EnvironmentSecretsProvider,
+            FileSecretsProvider,
+            CompositeSecretsProvider,
+        )
+        
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create file secret
+            with open(os.path.join(tmpdir, "api-key"), "w") as f:
+                f.write("secret-from-file")
+            
+            provider = CompositeSecretsProvider([
+                EnvironmentSecretsProvider(),  # Won't have this secret
+                FileSecretsProvider(tmpdir),
+            ])
+            
+            # Falls back to file
+            value = provider.get_secret("api-key")
+            
+            assert value == "secret-from-file"

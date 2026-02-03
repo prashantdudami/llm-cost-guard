@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "llm-cost-guard"
-version = "0.2.0"
+version = "0.3.0"
 description = "Real-time cost tracking, budget enforcement, and usage analytics for LLM applications"
 readme = "README.md"
 license = "MIT"
@@ -41,16 +41,41 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# LLM Providers
 anthropic = ["anthropic>=0.18.0"]
 bedrock = ["boto3>=1.28.0"]
 langchain = ["langchain>=0.1.0", "langchain-core>=0.1.0"]
+
+# Storage Backends
 sql = ["sqlalchemy>=2.0.0"]
 redis = ["redis>=4.5.0"]
+
+# Encryption (cloud-agnostic)
+encryption = ["cryptography>=41.0.0"]
+
+# Secrets Providers
+vault = ["hvac>=1.0.0"]
+
+# Cloud-specific (optional)
+aws = ["boto3>=1.28.0"]
+gcp = ["google-cloud-secret-manager>=2.0.0"]
+azure = ["azure-keyvault-secrets>=4.0.0", "azure-identity>=1.0.0"]
+
+# Observability (standard protocols)
 prometheus = ["prometheus-client>=0.17.0"]
+statsd = ["statsd>=4.0.0"]
 otel = ["opentelemetry-api>=1.20.0", "opentelemetry-sdk>=1.20.0"]
-all = [
-    "llm-cost-guard[anthropic,bedrock,langchain,sql,redis,prometheus,otel]"
+
+# All cloud-agnostic features
+full = [
+    "llm-cost-guard[encryption,prometheus,otel,redis,sql]"
 ]
+
+# All features including cloud providers
+all = [
+    "llm-cost-guard[anthropic,bedrock,langchain,sql,redis,encryption,vault,prometheus,otel]"
+]
+
 dev = [
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
@@ -59,6 +84,9 @@ dev = [
     "ruff>=0.1.0",
     "mypy>=1.5.0",
     "bandit>=1.7.0",
+    "cryptography>=41.0.0",
+    "redis>=4.5.0",
+    "prometheus-client>=0.17.0",
 ]
 
 [project.scripts]

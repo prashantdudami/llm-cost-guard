@@ -121,15 +121,28 @@ class RedisBackend(Backend):
         url: str = "redis://localhost:6379/0",
         prefix: str = "llm_cost_guard:",
         retention_days: int = 90,
+        ssl_cert_reqs: Optional[str] = None,
+        ssl_ca_certs: Optional[str] = None,
         **kwargs: Any,
     ):
         """
         Initialize Redis backend.
         
         Args:
-            url: Redis connection URL
+            url: Redis connection URL (redis:// or rediss:// for TLS)
             prefix: Key prefix for all Redis keys
             retention_days: How long to retain cost records
+            ssl_cert_reqs: SSL certificate requirements ('required', 'optional', 'none')
+            ssl_ca_certs: Path to CA certificates file
+            **kwargs: Additional Redis connection options
+            
+        TLS Support:
+            Use rediss:// URL scheme for TLS connections:
+            - rediss://localhost:6379/0
+            
+            Or configure SSL options:
+            - ssl_cert_reqs="required"
+            - ssl_ca_certs="/path/to/ca.pem"
         """
         try:
             import redis
@@ -142,8 +155,27 @@ class RedisBackend(Backend):
         self._prefix = prefix
         self._retention_days = retention_days
         
+        # Handle TLS configuration
+        connection_kwargs = dict(kwargs)
+        
+        # If using rediss:// URL, TLS is automatic
+        # For additional SSL config, add to kwargs
+        if ssl_cert_reqs:
+            import ssl
+            cert_reqs_map = {
+                "required": ssl.CERT_REQUIRED,
+                "optional": ssl.CERT_OPTIONAL,
+                "none": ssl.CERT_NONE,
+            }
+            connection_kwargs["ssl_cert_reqs"] = cert_reqs_map.get(
+                ssl_cert_reqs.lower(), ssl.CERT_REQUIRED
+            )
+        
+        if ssl_ca_certs:
+            connection_kwargs["ssl_ca_certs"] = ssl_ca_certs
+        
         # Parse URL and connect
-        self._client = redis.from_url(url, decode_responses=True, **kwargs)
+        self._client = redis.from_url(url, decode_responses=True, **connection_kwargs)
         
         # Register Lua scripts
         self._budget_check_script = self._client.register_script(BUDGET_CHECK_SCRIPT)

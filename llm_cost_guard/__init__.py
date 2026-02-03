@@ -23,8 +23,36 @@ from llm_cost_guard.audit import (
     LoggingAuditBackend,
     FileAuditBackend,
 )
+from llm_cost_guard.encryption import (
+    EncryptionProvider,
+    NoEncryption,
+    FernetEncryption,
+    FieldEncryption,
+    get_encryption_provider,
+)
+from llm_cost_guard.secrets import (
+    SecretsProvider,
+    EnvironmentSecretsProvider,
+    FileSecretsProvider,
+    get_secrets_provider,
+)
+from llm_cost_guard.resilience import (
+    CircuitBreaker,
+    CircuitBreakerConfig,
+    CircuitOpenError,
+    CircuitState,
+    retry_with_backoff,
+    RetryConfig,
+    ResilientOperation,
+)
+from llm_cost_guard.metrics import (
+    MetricsExporter,
+    NoOpExporter,
+    LoggingExporter,
+    get_metrics_exporter,
+)
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 __all__ = [
     # Core
@@ -44,6 +72,30 @@ __all__ = [
     "AuditEventType",
     "LoggingAuditBackend",
     "FileAuditBackend",
+    # Encryption
+    "EncryptionProvider",
+    "NoEncryption",
+    "FernetEncryption",
+    "FieldEncryption",
+    "get_encryption_provider",
+    # Secrets
+    "SecretsProvider",
+    "EnvironmentSecretsProvider",
+    "FileSecretsProvider",
+    "get_secrets_provider",
+    # Resilience
+    "CircuitBreaker",
+    "CircuitBreakerConfig",
+    "CircuitOpenError",
+    "CircuitState",
+    "retry_with_backoff",
+    "RetryConfig",
+    "ResilientOperation",
+    # Metrics
+    "MetricsExporter",
+    "NoOpExporter",
+    "LoggingExporter",
+    "get_metrics_exporter",
     # Exceptions
     "LLMCostGuardError",
     "BudgetExceededError",
