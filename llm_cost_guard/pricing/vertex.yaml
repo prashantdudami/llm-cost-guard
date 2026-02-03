@@ -1,0 +1,133 @@
+version: "2026-01-15"
+# Google Vertex AI / Gemini pricing
+models:
+  # Gemini 1.5 Pro
+  gemini-1.5-pro:
+    input_cost_per_1k: 0.00125
+    output_cost_per_1k: 0.005
+    context_window: 2000000
+    model_type: chat
+
+  gemini-1.5-pro-001:
+    input_cost_per_1k: 0.00125
+    output_cost_per_1k: 0.005
+    context_window: 2000000
+    model_type: chat
+
+  gemini-1.5-pro-002:
+    input_cost_per_1k: 0.00125
+    output_cost_per_1k: 0.005
+    context_window: 2000000
+    model_type: chat
+
+  # Gemini 1.5 Flash
+  gemini-1.5-flash:
+    input_cost_per_1k: 0.000075
+    output_cost_per_1k: 0.0003
+    context_window: 1000000
+    model_type: chat
+
+  gemini-1.5-flash-001:
+    input_cost_per_1k: 0.000075
+    output_cost_per_1k: 0.0003
+    context_window: 1000000
+    model_type: chat
+
+  gemini-1.5-flash-002:
+    input_cost_per_1k: 0.000075
+    output_cost_per_1k: 0.0003
+    context_window: 1000000
+    model_type: chat
+
+  # Gemini 1.0 Pro
+  gemini-1.0-pro:
+    input_cost_per_1k: 0.0005
+    output_cost_per_1k: 0.0015
+    context_window: 32760
+    model_type: chat
+
+  gemini-1.0-pro-001:
+    input_cost_per_1k: 0.0005
+    output_cost_per_1k: 0.0015
+    context_window: 32760
+    model_type: chat
+
+  gemini-1.0-pro-002:
+    input_cost_per_1k: 0.0005
+    output_cost_per_1k: 0.0015
+    context_window: 32760
+    model_type: chat
+
+  # Gemini 2.0 Flash
+  gemini-2.0-flash-exp:
+    input_cost_per_1k: 0.0
+    output_cost_per_1k: 0.0
+    context_window: 1000000
+    model_type: chat
+
+  # PaLM 2 (legacy)
+  text-bison:
+    input_cost_per_1k: 0.00025
+    output_cost_per_1k: 0.0005
+    context_window: 8192
+    model_type: chat
+
+  text-bison-32k:
+    input_cost_per_1k: 0.00025
+    output_cost_per_1k: 0.0005
+    context_window: 32000
+    model_type: chat
+
+  chat-bison:
+    input_cost_per_1k: 0.00025
+    output_cost_per_1k: 0.0005
+    context_window: 8192
+    model_type: chat
+
+  chat-bison-32k:
+    input_cost_per_1k: 0.00025
+    output_cost_per_1k: 0.0005
+    context_window: 32000
+    model_type: chat
+
+  # Embeddings
+  textembedding-gecko:
+    input_cost_per_1k: 0.00001
+    output_cost_per_1k: 0.0
+    context_window: 3072
+    model_type: embedding
+    embedding_dimensions: 768
+
+  textembedding-gecko-multilingual:
+    input_cost_per_1k: 0.00001
+    output_cost_per_1k: 0.0
+    context_window: 3072
+    model_type: embedding
+    embedding_dimensions: 768
+
+  text-embedding-004:
+    input_cost_per_1k: 0.00001
+    output_cost_per_1k: 0.0
+    context_window: 2048
+    model_type: embedding
+    embedding_dimensions: 768
+
+  text-multilingual-embedding-002:
+    input_cost_per_1k: 0.00001
+    output_cost_per_1k: 0.0
+    context_window: 2048
+    model_type: embedding
+    embedding_dimensions: 768
+
+  # Image models
+  imagen-3.0-generate-001:
+    input_cost_per_1k: 0.0
+    output_cost_per_1k: 0.0
+    image_cost_per_image: 0.04
+    model_type: image
+
+  imagen-3.0-fast-generate-001:
+    input_cost_per_1k: 0.0
+    output_cost_per_1k: 0.0
+    image_cost_per_image: 0.02
+    model_type: image

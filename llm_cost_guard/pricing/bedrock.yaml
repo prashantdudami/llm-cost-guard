@@ -1,0 +1,215 @@
+version: "2026-01-15"
+# AWS Bedrock pricing (us-east-1 region)
+models:
+  # Anthropic Claude on Bedrock
+  anthropic.claude-3-5-sonnet-20241022-v2:0:
+    input_cost_per_1k: 0.003
+    output_cost_per_1k: 0.015
+    context_window: 200000
+    model_type: chat
+
+  anthropic.claude-3-5-sonnet-20240620-v1:0:
+    input_cost_per_1k: 0.003
+    output_cost_per_1k: 0.015
+    context_window: 200000
+    model_type: chat
+
+  anthropic.claude-3-5-haiku-20241022-v1:0:
+    input_cost_per_1k: 0.0008
+    output_cost_per_1k: 0.004
+    context_window: 200000
+    model_type: chat
+
+  anthropic.claude-3-opus-20240229-v1:0:
+    input_cost_per_1k: 0.015
+    output_cost_per_1k: 0.075
+    context_window: 200000
+    model_type: chat
+
+  anthropic.claude-3-sonnet-20240229-v1:0:
+    input_cost_per_1k: 0.003
+    output_cost_per_1k: 0.015
+    context_window: 200000
+    model_type: chat
+
+  anthropic.claude-3-haiku-20240307-v1:0:
+    input_cost_per_1k: 0.00025
+    output_cost_per_1k: 0.00125
+    context_window: 200000
+    model_type: chat
+
+  anthropic.claude-v2:1:
+    input_cost_per_1k: 0.008
+    output_cost_per_1k: 0.024
+    context_window: 200000
+    model_type: chat
+
+  anthropic.claude-v2:
+    input_cost_per_1k: 0.008
+    output_cost_per_1k: 0.024
+    context_window: 100000
+    model_type: chat
+
+  anthropic.claude-instant-v1:
+    input_cost_per_1k: 0.0008
+    output_cost_per_1k: 0.0024
+    context_window: 100000
+    model_type: chat
+
+  # Amazon Titan
+  amazon.titan-text-premier-v1:0:
+    input_cost_per_1k: 0.0005
+    output_cost_per_1k: 0.0015
+    context_window: 32000
+    model_type: chat
+
+  amazon.titan-text-express-v1:
+    input_cost_per_1k: 0.0002
+    output_cost_per_1k: 0.0006
+    context_window: 8000
+    model_type: chat
+
+  amazon.titan-text-lite-v1:
+    input_cost_per_1k: 0.00015
+    output_cost_per_1k: 0.0002
+    context_window: 4000
+    model_type: chat
+
+  amazon.titan-embed-text-v1:
+    input_cost_per_1k: 0.0001
+    output_cost_per_1k: 0.0
+    context_window: 8000
+    model_type: embedding
+    embedding_dimensions: 1536
+
+  amazon.titan-embed-text-v2:0:
+    input_cost_per_1k: 0.00002
+    output_cost_per_1k: 0.0
+    context_window: 8000
+    model_type: embedding
+    embedding_dimensions: 1024
+
+  # Meta Llama
+  meta.llama3-2-90b-instruct-v1:0:
+    input_cost_per_1k: 0.002
+    output_cost_per_1k: 0.002
+    context_window: 128000
+    model_type: chat
+
+  meta.llama3-2-11b-instruct-v1:0:
+    input_cost_per_1k: 0.00016
+    output_cost_per_1k: 0.00016
+    context_window: 128000
+    model_type: chat
+
+  meta.llama3-2-3b-instruct-v1:0:
+    input_cost_per_1k: 0.00015
+    output_cost_per_1k: 0.00015
+    context_window: 128000
+    model_type: chat
+
+  meta.llama3-2-1b-instruct-v1:0:
+    input_cost_per_1k: 0.0001
+    output_cost_per_1k: 0.0001
+    context_window: 128000
+    model_type: chat
+
+  meta.llama3-1-405b-instruct-v1:0:
+    input_cost_per_1k: 0.00195
+    output_cost_per_1k: 0.00256
+    context_window: 128000
+    model_type: chat
+
+  meta.llama3-1-70b-instruct-v1:0:
+    input_cost_per_1k: 0.00072
+    output_cost_per_1k: 0.00072
+    context_window: 128000
+    model_type: chat
+
+  meta.llama3-1-8b-instruct-v1:0:
+    input_cost_per_1k: 0.00022
+    output_cost_per_1k: 0.00022
+    context_window: 128000
+    model_type: chat
+
+  meta.llama3-70b-instruct-v1:0:
+    input_cost_per_1k: 0.00265
+    output_cost_per_1k: 0.0035
+    context_window: 8000
+    model_type: chat
+
+  meta.llama3-8b-instruct-v1:0:
+    input_cost_per_1k: 0.0003
+    output_cost_per_1k: 0.0006
+    context_window: 8000
+    model_type: chat
+
+  # Mistral
+  mistral.mistral-large-2407-v1:0:
+    input_cost_per_1k: 0.002
+    output_cost_per_1k: 0.006
+    context_window: 128000
+    model_type: chat
+
+  mistral.mistral-large-2402-v1:0:
+    input_cost_per_1k: 0.004
+    output_cost_per_1k: 0.012
+    context_window: 32000
+    model_type: chat
+
+  mistral.mistral-small-2402-v1:0:
+    input_cost_per_1k: 0.001
+    output_cost_per_1k: 0.003
+    context_window: 32000
+    model_type: chat
+
+  mistral.mixtral-8x7b-instruct-v0:1:
+    input_cost_per_1k: 0.00045
+    output_cost_per_1k: 0.0007
+    context_window: 32000
+    model_type: chat
+
+  mistral.mistral-7b-instruct-v0:2:
+    input_cost_per_1k: 0.00015
+    output_cost_per_1k: 0.0002
+    context_window: 32000
+    model_type: chat
+
+  # Cohere
+  cohere.command-r-plus-v1:0:
+    input_cost_per_1k: 0.003
+    output_cost_per_1k: 0.015
+    context_window: 128000
+    model_type: chat
+
+  cohere.command-r-v1:0:
+    input_cost_per_1k: 0.0005
+    output_cost_per_1k: 0.0015
+    context_window: 128000
+    model_type: chat
+
+  cohere.command-text-v14:
+    input_cost_per_1k: 0.0015
+    output_cost_per_1k: 0.002
+    context_window: 4096
+    model_type: chat
+
+  cohere.command-light-text-v14:
+    input_cost_per_1k: 0.0003
+    output_cost_per_1k: 0.0006
+    context_window: 4096
+    model_type: chat
+
+  cohere.embed-english-v3:
+    input_cost_per_1k: 0.0001
+    output_cost_per_1k: 0.0
+    context_window: 512
+    model_type: embedding
+    embedding_dimensions: 1024
+
+  cohere.embed-multilingual-v3:
+    input_cost_per_1k: 0.0001
+    output_cost_per_1k: 0.0
+    context_window: 512
+    model_type: embedding
+    embedding_dimensions: 1024

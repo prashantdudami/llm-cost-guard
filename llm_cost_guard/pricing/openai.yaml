@@ -1,0 +1,148 @@
+version: "2026-01-15"
+models:
+  # GPT-4o models
+  gpt-4o:
+    input_cost_per_1k: 0.0025
+    output_cost_per_1k: 0.01
+    cached_input_cost_per_1k: 0.00125
+    context_window: 128000
+    model_type: chat
+
+  gpt-4o-2024-11-20:
+    input_cost_per_1k: 0.0025
+    output_cost_per_1k: 0.01
+    cached_input_cost_per_1k: 0.00125
+    context_window: 128000
+    model_type: chat
+
+  gpt-4o-mini:
+    input_cost_per_1k: 0.00015
+    output_cost_per_1k: 0.0006
+    cached_input_cost_per_1k: 0.000075
+    context_window: 128000
+    model_type: chat
+
+  gpt-4o-mini-2024-07-18:
+    input_cost_per_1k: 0.00015
+    output_cost_per_1k: 0.0006
+    cached_input_cost_per_1k: 0.000075
+    context_window: 128000
+    model_type: chat
+
+  # GPT-4 Turbo
+  gpt-4-turbo:
+    input_cost_per_1k: 0.01
+    output_cost_per_1k: 0.03
+    context_window: 128000
+    model_type: chat
+
+  gpt-4-turbo-preview:
+    input_cost_per_1k: 0.01
+    output_cost_per_1k: 0.03
+    context_window: 128000
+    model_type: chat
+
+  # GPT-4
+  gpt-4:
+    input_cost_per_1k: 0.03
+    output_cost_per_1k: 0.06
+    context_window: 8192
+    model_type: chat
+
+  gpt-4-32k:
+    input_cost_per_1k: 0.06
+    output_cost_per_1k: 0.12
+    context_window: 32768
+    model_type: chat
+
+  # GPT-3.5 Turbo
+  gpt-3.5-turbo:
+    input_cost_per_1k: 0.0005
+    output_cost_per_1k: 0.0015
+    context_window: 16385
+    model_type: chat
+
+  gpt-3.5-turbo-0125:
+    input_cost_per_1k: 0.0005
+    output_cost_per_1k: 0.0015
+    context_window: 16385
+    model_type: chat
+
+  gpt-3.5-turbo-instruct:
+    input_cost_per_1k: 0.0015
+    output_cost_per_1k: 0.002
+    context_window: 4096
+    model_type: completion
+
+  # o1 reasoning models
+  o1:
+    input_cost_per_1k: 0.015
+    output_cost_per_1k: 0.06
+    cached_input_cost_per_1k: 0.0075
+    context_window: 200000
+    model_type: chat
+
+  o1-preview:
+    input_cost_per_1k: 0.015
+    output_cost_per_1k: 0.06
+    context_window: 128000
+    model_type: chat
+
+  o1-mini:
+    input_cost_per_1k: 0.003
+    output_cost_per_1k: 0.012
+    cached_input_cost_per_1k: 0.0015
+    context_window: 128000
+    model_type: chat
+
+  # Embedding models
+  text-embedding-3-small:
+    input_cost_per_1k: 0.00002
+    output_cost_per_1k: 0.0
+    context_window: 8191
+    model_type: embedding
+    embedding_dimensions: 1536
+
+  text-embedding-3-large:
+    input_cost_per_1k: 0.00013
+    output_cost_per_1k: 0.0
+    context_window: 8191
+    model_type: embedding
+    embedding_dimensions: 3072
+
+  text-embedding-ada-002:
+    input_cost_per_1k: 0.0001
+    output_cost_per_1k: 0.0
+    context_window: 8191
+    model_type: embedding
+    embedding_dimensions: 1536
+
+  # Image models (DALL-E)
+  dall-e-3:
+    input_cost_per_1k: 0.0
+    output_cost_per_1k: 0.0
+    image_cost_per_image: 0.04  # standard quality 1024x1024
+    model_type: image
+
+  dall-e-2:
+    input_cost_per_1k: 0.0
+    output_cost_per_1k: 0.0
+    image_cost_per_image: 0.02
+    model_type: image
+
+  # Audio models
+  whisper-1:
+    input_cost_per_1k: 0.0
+    output_cost_per_1k: 0.0
+    audio_cost_per_minute: 0.006
+    model_type: audio
+
+  tts-1:
+    input_cost_per_1k: 0.015
+    output_cost_per_1k: 0.0
+    model_type: audio
+
+  tts-1-hd:
+    input_cost_per_1k: 0.03
+    output_cost_per_1k: 0.0
+    model_type: audio
