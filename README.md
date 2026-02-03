@@ -293,3 +293,10 @@ Contributions are welcome! Please read our contributing guidelines and submit pu
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
+
+## Author
+
+**Prashant Dudami**
+- LinkedIn: [linkedin.com/in/prashantdudami](https://www.linkedin.com/in/prashantdudami/)
+- GitHub: [github.com/prashantdudami](https://github.com/prashantdudami)
+- Email: prashant.dudami@gmail.com
