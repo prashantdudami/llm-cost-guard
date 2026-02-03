@@ -706,7 +706,7 @@ class TestGracefulDegradation:
         """Test complete workflow in fallback mode."""
         from unittest.mock import patch
         
-        with patch("llm_cost_guard.backends.get_backend") as mock_get_backend:
+        with patch("llm_cost_guard.tracker.get_backend") as mock_get_backend:
             mock_get_backend.side_effect = Exception("Backend unavailable")
             
             tracker = CostTracker(
@@ -737,7 +737,7 @@ class TestGracefulDegradation:
         """Test allow mode continues on errors."""
         from unittest.mock import patch
         
-        with patch("llm_cost_guard.backends.get_backend") as mock_get_backend:
+        with patch("llm_cost_guard.tracker.get_backend") as mock_get_backend:
             mock_get_backend.side_effect = Exception("Backend unavailable")
             
             tracker = CostTracker(

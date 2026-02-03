@@ -362,6 +362,11 @@ class RedisBackend(Backend):
             self._metrics["backend_failures"] += 1
             raise
 
+    def save_records(self, records: List[CostRecord]) -> None:
+        """Save multiple cost records."""
+        for record in records:
+            self.save_record(record)
+
     def _update_aggregates(self, pipe: Any, record: CostRecord) -> None:
         """Update aggregate counters for quick reporting."""
         date_str = record.timestamp.strftime("%Y-%m-%d")
@@ -488,6 +493,87 @@ class RedisBackend(Backend):
             groups[key]["tokens"] += record.input_tokens + record.output_tokens
         
         return groups
+
+    def get_total_cost(
+        self,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        tags: Optional[Dict[str, str]] = None,
+    ) -> float:
+        """Get total cost for the given filters."""
+        records = self.get_records(start_date, end_date, tags)
+        return sum(r.total_cost for r in records)
+
+    def get_aggregated_costs(
+        self,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        tags: Optional[Dict[str, str]] = None,
+        group_by: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """Get aggregated costs grouped by specified fields."""
+        records = self.get_records(start_date, end_date, tags)
+        
+        if not group_by:
+            return {
+                "total_cost": sum(r.total_cost for r in records),
+                "total_calls": len(records),
+                "total_tokens": sum(r.input_tokens + r.output_tokens for r in records),
+            }
+        
+        groups = self._group_records(records, group_by)
+        return {"groups": [{"key": k, **v} for k, v in groups.items()]}
+
+    def delete_records(
+        self,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        tags: Optional[Dict[str, str]] = None,
+    ) -> int:
+        """Delete records matching the filters."""
+        records_key = self._key("records")
+        
+        try:
+            # Get record keys to delete
+            min_score = start_date.timestamp() if start_date else "-inf"
+            max_score = end_date.timestamp() if end_date else "+inf"
+            
+            record_keys = self._client.zrangebyscore(records_key, min_score, max_score)
+            
+            if not record_keys:
+                return 0
+            
+            # If tags filter, we need to check each record
+            if tags:
+                keys_to_delete = []
+                pipe = self._client.pipeline()
+                for key in record_keys:
+                    pipe.get(key)
+                results = pipe.execute()
+                
+                for key, data in zip(record_keys, results):
+                    if data:
+                        record = self._deserialize_record(json.loads(data))
+                        if all(record.tags.get(k) == v for k, v in tags.items()):
+                            keys_to_delete.append(key)
+                record_keys = keys_to_delete
+            
+            if not record_keys:
+                return 0
+            
+            # Delete records and remove from sorted set
+            pipe = self._client.pipeline()
+            for key in record_keys:
+                pipe.delete(key)
+                pipe.zrem(records_key, key)
+            pipe.execute()
+            
+            return len(record_keys)
+            
+        except Exception as e:
+            logger.error(f"Redis delete records failed: {e}")
+            self._metrics["backend_failures"] += 1
+            return 0
 
     def _serialize_record(self, record: CostRecord) -> Dict[str, Any]:
         """Serialize a CostRecord to dict."""

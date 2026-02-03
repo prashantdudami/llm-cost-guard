@@ -77,7 +77,7 @@ class TestTrackerMetrics:
 
     def test_fallback_activation_metric(self):
         """Test fallback_activations increments when backend fails."""
-        with patch("llm_cost_guard.backends.get_backend") as mock_get_backend:
+        with patch("llm_cost_guard.tracker.get_backend") as mock_get_backend:
             mock_get_backend.side_effect = Exception("Backend unavailable")
             
             tracker = CostTracker(
@@ -93,7 +93,7 @@ class TestTrackerMetrics:
 
     def test_backend_failures_metric(self):
         """Test backend_failures increments on errors."""
-        with patch("llm_cost_guard.backends.get_backend") as mock_get_backend:
+        with patch("llm_cost_guard.tracker.get_backend") as mock_get_backend:
             mock_get_backend.side_effect = Exception("Backend unavailable")
             
             tracker = CostTracker(
@@ -265,7 +265,7 @@ class TestHealthCheckWithMetrics:
 
     def test_health_includes_fallback_status(self):
         """Test health check reports fallback status."""
-        with patch("llm_cost_guard.backends.get_backend") as mock_get_backend:
+        with patch("llm_cost_guard.tracker.get_backend") as mock_get_backend:
             mock_get_backend.side_effect = Exception("Backend unavailable")
             
             tracker = CostTracker(
