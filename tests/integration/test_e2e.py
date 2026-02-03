@@ -535,3 +535,224 @@ class TestEdgeCases:
         assert tracker.last_call() is not None
 
         tracker.close()
+
+
+class TestAuditWorkflow:
+    """End-to-end tests for audit logging."""
+
+    def test_complete_audit_trail(self):
+        """Test complete audit trail for budget lifecycle."""
+        from llm_cost_guard.audit import LoggingAuditBackend, AuditEventType
+        
+        audit_backend = LoggingAuditBackend()
+        
+        tracker = CostTracker(
+            backend="memory",
+            budgets=[
+                Budget(
+                    name="daily",
+                    limit=1.00,
+                    action=BudgetAction.BLOCK,
+                    warning_threshold=0.5,
+                ),
+            ],
+            audit_backend=audit_backend,
+        )
+        
+        # Should have logged budget creation
+        creation_events = audit_backend.query(event_type=AuditEventType.BUDGET_CREATED)
+        assert len(creation_events) == 1
+        assert creation_events[0].resource == "daily"
+        
+        # Make some calls until we exceed budget
+        try:
+            for i in range(50):
+                tracker.record(
+                    provider="openai",
+                    model="gpt-4o",
+                    input_tokens=10000,
+                    output_tokens=5000,
+                )
+        except BudgetExceededError:
+            pass  # Expected
+        
+        # Should have warning and exceeded events
+        warning_events = audit_backend.query(event_type=AuditEventType.BUDGET_WARNING)
+        exceeded_events = audit_backend.query(event_type=AuditEventType.BUDGET_EXCEEDED)
+        
+        assert len(exceeded_events) >= 1
+        
+        tracker.close()
+
+    def test_audit_query_by_resource(self):
+        """Test querying audit by resource."""
+        from llm_cost_guard.audit import LoggingAuditBackend
+        
+        audit_backend = LoggingAuditBackend()
+        
+        tracker = CostTracker(
+            backend="memory",
+            budgets=[
+                Budget(name="daily", limit=100.0, action=BudgetAction.WARN),
+                Budget(name="monthly", limit=1000.0, action=BudgetAction.WARN),
+            ],
+            audit_backend=audit_backend,
+        )
+        
+        # Get history for specific budget
+        daily_history = tracker.audit.get_budget_history("daily")
+        monthly_history = tracker.audit.get_budget_history("monthly")
+        
+        assert len(daily_history) == 1  # Creation event
+        assert len(monthly_history) == 1  # Creation event
+        
+        tracker.close()
+
+
+class TestMetricsWorkflow:
+    """End-to-end tests for metrics and observability."""
+
+    def test_metrics_accumulation(self):
+        """Test metrics accumulate correctly over workflow."""
+        tracker = CostTracker(
+            backend="memory",
+            budgets=[
+                Budget(name="session", limit=10.0, action=BudgetAction.BLOCK),
+            ],
+        )
+        
+        # Track some calls
+        for _ in range(10):
+            tracker.record(
+                provider="openai",
+                model="gpt-4o",
+                input_tokens=100,
+                output_tokens=50,
+            )
+        
+        metrics = tracker.get_metrics()
+        
+        assert metrics["budget_checks"] == 10
+        assert metrics["using_fallback"] is False
+        assert metrics["backend_failures"] == 0
+        
+        tracker.close()
+
+    def test_health_check_with_activity(self):
+        """Test health check reflects activity."""
+        tracker = CostTracker(backend="memory")
+        
+        # Initially healthy
+        health = tracker.health_check()
+        assert health.healthy is True
+        assert health.last_record_time is None
+        
+        # Make a call
+        tracker.record(
+            provider="openai",
+            model="gpt-4o",
+            input_tokens=100,
+            output_tokens=50,
+        )
+        
+        # Health should reflect activity
+        health = tracker.health_check()
+        assert health.healthy is True
+        assert health.last_record_time is not None
+        
+        tracker.close()
+
+    def test_metrics_with_errors(self):
+        """Test metrics track errors correctly."""
+        tracker = CostTracker(
+            backend="memory",
+            budgets=[
+                Budget(name="tiny", limit=0.001, action=BudgetAction.BLOCK),
+            ],
+        )
+        
+        # First call might succeed
+        try:
+            tracker.record(
+                provider="openai",
+                model="gpt-4o",
+                input_tokens=100,
+                output_tokens=50,
+            )
+        except BudgetExceededError:
+            pass
+        
+        # Second call should fail
+        try:
+            tracker.record(
+                provider="openai",
+                model="gpt-4o",
+                input_tokens=100,
+                output_tokens=50,
+            )
+        except BudgetExceededError:
+            pass
+        
+        metrics = tracker.get_metrics()
+        assert metrics["budget_exceeded_count"] >= 1
+        
+        tracker.close()
+
+
+class TestGracefulDegradation:
+    """End-to-end tests for graceful degradation."""
+
+    def test_fallback_mode_workflow(self):
+        """Test complete workflow in fallback mode."""
+        from unittest.mock import patch
+        
+        with patch("llm_cost_guard.backends.get_backend") as mock_get_backend:
+            mock_get_backend.side_effect = Exception("Backend unavailable")
+            
+            tracker = CostTracker(
+                backend="redis://localhost:6379",
+                on_tracking_failure="fallback",
+            )
+            
+            # Should still work with fallback
+            tracker.record(
+                provider="openai",
+                model="gpt-4o",
+                input_tokens=100,
+                output_tokens=50,
+            )
+            
+            # Health should report fallback
+            health = tracker.health_check()
+            assert health.healthy is False
+            
+            # Metrics should show fallback
+            metrics = tracker.get_metrics()
+            assert metrics["using_fallback"] is True
+            assert metrics["fallback_activations"] == 1
+            
+            tracker.close()
+
+    def test_allow_mode_continues(self):
+        """Test allow mode continues on errors."""
+        from unittest.mock import patch
+        
+        with patch("llm_cost_guard.backends.get_backend") as mock_get_backend:
+            mock_get_backend.side_effect = Exception("Backend unavailable")
+            
+            tracker = CostTracker(
+                backend="redis://localhost:6379",
+                on_tracking_failure="allow",
+            )
+            
+            # Should still work
+            tracker.record(
+                provider="openai",
+                model="gpt-4o",
+                input_tokens=100,
+                output_tokens=50,
+            )
+            
+            assert tracker.last_call() is not None
+            
+            tracker.close()
