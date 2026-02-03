@@ -271,6 +271,57 @@ tracker = CostTracker(
 )
 ```
 
+## Audit Logging (v0.2.0+)
+
+Enterprise-ready audit trails for compliance:
+
+```python
+from llm_cost_guard import CostTracker, FileAuditBackend
+
+# Enable audit logging
+tracker = CostTracker(
+    audit_enabled=True,
+    audit_backend=FileAuditBackend("audit.log"),
+)
+
+# Query audit history
+events = tracker.audit.query(
+    event_type=AuditEventType.BUDGET_EXCEEDED,
+    start_date="2024-01-01",
+)
+
+# Get budget-specific history
+history = tracker.audit.get_budget_history("daily")
+```
+
+Audit events include:
+- Budget created/modified/deleted
+- Budget warnings and exceeded events
+- Rate limit exceeded events
+- Tracking failures and fallback activations
+
+## Observability Metrics (v0.2.0+)
+
+Track health and degradation:
+
+```python
+# Get tracker metrics
+metrics = tracker.get_metrics()
+print(metrics)
+# {
+#   "backend_failures": 0,
+#   "fallback_activations": 0,
+#   "budget_exceeded_count": 3,
+#   "tracking_errors": 0,
+#   "using_fallback": False,
+# }
+
+# Health check
+health = tracker.health_check()
+print(health.healthy)  # True/False
+print(health.errors)   # List of issues
+```
+
 ## Custom Pricing
 
 For negotiated enterprise rates:
@@ -285,6 +336,30 @@ tracker = CostTracker(
     }
 )
 ```
+
+## Current Limitations
+
+Being transparent about what's not yet production-ready:
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Distributed budgets (Redis) | ✅ v0.2.0 | Atomic operations with Lua scripts |
+| Audit logging | ✅ v0.2.0 | File and logging backends |
+| Graceful degradation metrics | ✅ v0.2.0 | Track failures and fallbacks |
+| PostgreSQL backend | 🚧 Planned | Use SQLite or Redis for now |
+| DynamoDB backend | 🚧 Planned | Use SQLite or Redis for now |
+| Encryption at rest | 🚧 Planned | Use encrypted volumes as workaround |
+| Multi-tenancy optimization | 🚧 Planned | Use tag-scoped budgets for now |
+| Streaming cost estimation | ⚠️ Limited | Actual cost tracked on completion |
+| Fine-tuning cost tracking | ❌ Not supported | |
+
+### Recommended for Production
+
+| Deployment Size | Backend | Notes |
+|-----------------|---------|-------|
+| Single instance | SQLite | Simple, no setup |
+| Multiple instances | Redis | Distributed budget enforcement |
+| High-volume (>1k req/s) | Redis | With sampling (coming soon) |
 
 ## Contributing
 

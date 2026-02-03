@@ -40,7 +40,7 @@ def get_backend(backend_url: str, **kwargs) -> Backend:
         return PostgresBackend(backend_url, **kwargs)
 
     if backend_url.startswith("redis://"):
-        from llm_cost_guard.backends.redis import RedisBackend
+        from llm_cost_guard.backends.redis_backend import RedisBackend
 
         return RedisBackend(backend_url, **kwargs)
 

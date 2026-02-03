@@ -15,8 +15,16 @@ from llm_cost_guard.exceptions import (
     TrackingUnavailableError,
     RateLimitExceededError,
 )
+from llm_cost_guard.audit import (
+    AuditLogger,
+    AuditBackend,
+    AuditEvent,
+    AuditEventType,
+    LoggingAuditBackend,
+    FileAuditBackend,
+)
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     # Core
@@ -29,6 +37,13 @@ __all__ = [
     "CostRecord",
     "CostReport",
     "HealthStatus",
+    # Audit
+    "AuditLogger",
+    "AuditBackend",
+    "AuditEvent",
+    "AuditEventType",
+    "LoggingAuditBackend",
+    "FileAuditBackend",
     # Exceptions
     "LLMCostGuardError",
     "BudgetExceededError",

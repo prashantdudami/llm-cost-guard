@@ -23,6 +23,7 @@ from llm_cost_guard.pricing.loader import PricingLoader, get_pricing_loader
 from llm_cost_guard.providers import detect_provider, get_provider
 from llm_cost_guard.rate_limit import RateLimit, RateLimiter
 from llm_cost_guard.span import Span, get_current_span
+from llm_cost_guard.audit import AuditLogger, AuditBackend, LoggingAuditBackend
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,8 @@ class CostTracker:
         budget_mode: Literal["local", "distributed"] = "local",
         streaming_budget_mode: Literal["estimate", "actual"] = "actual",
         streaming_max_output_estimate: int = 4096,
+        audit_enabled: bool = True,
+        audit_backend: Optional[AuditBackend] = None,
         **backend_kwargs: Any,
     ):
         """
@@ -72,6 +75,8 @@ class CostTracker:
             budget_mode: Budget enforcement mode (local or distributed)
             streaming_budget_mode: How to handle streaming budgets
             streaming_max_output_estimate: Max output tokens to estimate for streaming
+            audit_enabled: Enable audit logging for compliance
+            audit_backend: Custom audit backend (defaults to logging)
         """
         self._auto_detect_provider = auto_detect_provider
         self._on_tracking_failure = on_tracking_failure
@@ -83,27 +88,59 @@ class CostTracker:
         self._streaming_budget_mode = streaming_budget_mode
         self._streaming_max_output_estimate = streaming_max_output_estimate
 
+        # Graceful degradation metrics
+        self._metrics = {
+            "backend_failures": 0,
+            "fallback_activations": 0,
+            "budget_checks": 0,
+            "budget_exceeded_count": 0,
+            "rate_limit_exceeded_count": 0,
+            "tracking_errors": 0,
+        }
+        self._metrics_lock = threading.Lock()
+
+        # Initialize audit logging
+        self._audit = AuditLogger(
+            backend=audit_backend or LoggingAuditBackend(),
+            enabled=audit_enabled,
+        )
+
         # Initialize backend
         self._backend_url = backend
         self._fallback_backend: Optional[MemoryBackend] = None
+        self._using_fallback = False
         try:
             self._backend: Backend = get_backend(backend, **backend_kwargs)
         except Exception as e:
+            self._increment_metric("backend_failures")
             if on_tracking_failure == "block":
                 raise TrackingUnavailableError(f"Failed to initialize backend: {e}", backend)
             elif on_tracking_failure == "fallback":
                 logger.warning(f"Failed to initialize backend {backend}, using memory fallback: {e}")
                 self._backend = MemoryBackend()
                 self._fallback_backend = self._backend
+                self._using_fallback = True
+                self._increment_metric("fallback_activations")
+                self._audit.log_fallback_activated(backend, "memory", str(e))
             else:
                 logger.warning(f"Failed to initialize backend {backend}: {e}")
                 self._backend = MemoryBackend()
+                self._audit.log_tracking_failure(str(e), backend, "allow")
 
         # Initialize pricing
         self._pricing = PricingLoader(pricing_overrides=pricing_overrides)
 
         # Initialize budget tracking
         self._budget_tracker = BudgetTracker(budgets)
+        
+        # Log budget creation for audit
+        for budget in (budgets or []):
+            self._audit.log_budget_created(
+                budget.name,
+                budget.limit,
+                budget.period,
+                budget.action.value,
+            )
 
         # Initialize rate limiting
         self._rate_limiter = RateLimiter(rate_limits)
@@ -115,6 +152,11 @@ class CostTracker:
         # Last call tracking
         self._last_record: Optional[CostRecord] = None
         self._lock = threading.Lock()
+    
+    def _increment_metric(self, metric: str, amount: int = 1) -> None:
+        """Thread-safe metric increment."""
+        with self._metrics_lock:
+            self._metrics[metric] = self._metrics.get(metric, 0) + amount
 
     def track(
         self,
@@ -344,13 +386,31 @@ class CostTracker:
                 )
 
         # Check budgets
+        self._increment_metric("budget_checks")
         exceeded = self._budget_tracker.check_budget(total_cost, tags)
         for budget, action in exceeded:
-            if action == BudgetAction.BLOCK:
+            current_spending = self._budget_tracker.get_spending(budget.name)
+            
+            # Log to audit
+            if action == BudgetAction.WARN:
+                self._audit.log_budget_warning(
+                    budget.name,
+                    current_spending,
+                    budget.limit,
+                    current_spending / budget.limit,
+                )
+            elif action == BudgetAction.BLOCK:
+                self._increment_metric("budget_exceeded_count")
+                self._audit.log_budget_exceeded(
+                    budget.name,
+                    current_spending,
+                    budget.limit,
+                    "blocked",
+                )
                 raise BudgetExceededError(
                     f"Budget '{budget.name}' would be exceeded",
                     budget=budget,
-                    current=self._budget_tracker.get_spending(budget.name),
+                    current=current_spending,
                     limit=budget.limit,
                 )
 
@@ -358,6 +418,13 @@ class CostTracker:
         rate_exceeded = self._rate_limiter.check(model=model, provider=provider, tags=tags)
         if rate_exceeded:
             limit, current, retry_after = rate_exceeded[0]
+            self._increment_metric("rate_limit_exceeded_count")
+            self._audit.log_rate_limit_exceeded(
+                limit.name,
+                current,
+                limit.limit,
+                retry_after,
+            )
             raise RateLimitExceededError(
                 f"Rate limit '{limit.name}' exceeded",
                 limit_name=limit.name,
@@ -481,14 +548,24 @@ class CostTracker:
 
     def _handle_tracking_error(self, error: Exception) -> None:
         """Handle errors during tracking based on configuration."""
+        self._increment_metric("tracking_errors")
+        self._increment_metric("backend_failures")
+        
         if self._on_tracking_failure == "block":
+            self._audit.log_tracking_failure(str(error), self._backend_url, "blocked")
             raise TrackingUnavailableError(str(error), self._backend_url)
         elif self._on_tracking_failure == "fallback":
             logger.warning(f"Tracking error, using fallback: {error}")
             if self._fallback_backend is None:
                 self._fallback_backend = MemoryBackend()
+                self._using_fallback = True
+                self._increment_metric("fallback_activations")
+                self._audit.log_fallback_activated(
+                    self._backend_url, "memory", str(error)
+                )
         else:
             logger.warning(f"Tracking error (allowing): {error}")
+            self._audit.log_tracking_failure(str(error), self._backend_url, "allowed")
 
     def _check_tag_cardinality(self, tags: Dict[str, str]) -> None:
         """Check and track tag cardinality."""
@@ -648,6 +725,10 @@ class CostTracker:
         except Exception as e:
             errors.append(f"Backend health check failed: {e}")
 
+        # Check if using fallback
+        if self._using_fallback:
+            errors.append("Using fallback backend (primary unavailable)")
+
         # Check pricing freshness
         pricing_fresh = not self._pricing.is_stale
         if self._pricing.is_stale:
@@ -660,7 +741,7 @@ class CostTracker:
                 last_record_time = self._last_record.timestamp
 
         return HealthStatus(
-            healthy=backend_connected and pricing_fresh and len(errors) == 0,
+            healthy=backend_connected and pricing_fresh and len(errors) == 0 and not self._using_fallback,
             backend_connected=backend_connected,
             pricing_fresh=pricing_fresh,
             last_record_time=last_record_time,
@@ -669,6 +750,36 @@ class CostTracker:
             pricing_version=str(self._pricing.pricing_version),
             pricing_last_updated=self._pricing.last_updated,
         )
+
+    def get_metrics(self) -> Dict[str, Any]:
+        """
+        Get tracker metrics for observability.
+        
+        Returns metrics for:
+        - backend_failures: Number of backend operation failures
+        - fallback_activations: Number of times fallback was activated
+        - budget_checks: Total budget checks performed
+        - budget_exceeded_count: Number of budget exceeded events
+        - rate_limit_exceeded_count: Number of rate limit exceeded events
+        - tracking_errors: Total tracking errors
+        - using_fallback: Whether currently using fallback backend
+        """
+        with self._metrics_lock:
+            metrics = dict(self._metrics)
+        
+        metrics["using_fallback"] = self._using_fallback
+        metrics["backend_url"] = self._backend_url
+        
+        # Add backend-specific metrics if available
+        if hasattr(self._backend, "get_metrics"):
+            metrics["backend_metrics"] = self._backend.get_metrics()
+        
+        return metrics
+
+    @property
+    def audit(self) -> AuditLogger:
+        """Get the audit logger for querying audit events."""
+        return self._audit
 
     def on_budget_warning(self, callback: Callable[[Budget, float], None]) -> None:
         """Register a callback for budget warnings."""
