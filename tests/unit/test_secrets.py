@@ -120,6 +120,33 @@ class TestFileSecretsProvider:
             
             assert value == "value with spaces"
 
+    def test_rejects_path_traversal(self):
+        """Test that path traversal attempts are rejected."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            provider = FileSecretsProvider(base_path=tmpdir)
+            
+            # All these should be rejected
+            assert provider.get_secret("../etc/passwd") is None
+            assert provider.get_secret("..") is None
+            assert provider.get_secret("foo/../bar") is None
+            assert provider.get_secret("/etc/passwd") is None
+            assert provider.get_secret("subdir/secret") is None
+
+    def test_rejects_empty_key(self):
+        """Test that empty keys are rejected."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            provider = FileSecretsProvider(base_path=tmpdir)
+            
+            assert provider.get_secret("") is None
+            assert provider.get_secret("   ") is None
+
+    def test_rejects_null_bytes(self):
+        """Test that keys with null bytes are rejected."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            provider = FileSecretsProvider(base_path=tmpdir)
+            
+            assert provider.get_secret("secret\x00.txt") is None
+
 
 class TestCompositeSecretsProvider:
     """Tests for CompositeSecretsProvider."""

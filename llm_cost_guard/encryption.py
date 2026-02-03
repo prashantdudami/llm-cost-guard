@@ -125,20 +125,55 @@ class HashedEncryption(EncryptionProvider):
     
     Use for fields like user_id where you need consistency
     but don't need to recover the original value.
+    
+    Security:
+        - Uses HMAC-SHA256 for secure hashing
+        - Salt is required and must be at least 16 bytes
+        - Generates a secure random salt if none provided
     """
 
-    def __init__(self, salt: str = ""):
+    MIN_SALT_LENGTH = 16
+
+    def __init__(self, salt: Optional[str] = None):
         """
-        Initialize with optional salt.
+        Initialize with a salt.
         
         Args:
-            salt: Salt to add before hashing (recommended for security)
+            salt: Salt for hashing. If not provided, generates a random salt.
+                  For consistency across restarts, provide a fixed salt.
+                  
+        Security:
+            Salt should be at least 16 characters for security.
         """
-        self._salt = salt.encode("utf-8")
+        import hmac
+        import secrets as secrets_module
+        
+        if salt is None:
+            # Generate a secure random salt
+            self._salt = secrets_module.token_bytes(32)
+            logger.warning(
+                "HashedEncryption: Generated random salt. "
+                "For consistent hashing across restarts, provide a fixed salt."
+            )
+        else:
+            self._salt = salt.encode("utf-8")
+            if len(self._salt) < self.MIN_SALT_LENGTH:
+                logger.warning(
+                    f"HashedEncryption: Salt should be at least {self.MIN_SALT_LENGTH} bytes. "
+                    f"Current salt is {len(self._salt)} bytes."
+                )
+        
+        self._hmac_key = self._salt
 
     def encrypt(self, plaintext: bytes) -> bytes:
-        """Hash the plaintext (one-way, not reversible)."""
-        return hashlib.sha256(self._salt + plaintext).hexdigest().encode("utf-8")
+        """Hash the plaintext using HMAC-SHA256 (one-way, not reversible)."""
+        import hmac
+        # Use HMAC for secure keyed hashing
+        return hmac.new(
+            self._hmac_key, 
+            plaintext, 
+            hashlib.sha256
+        ).hexdigest().encode("utf-8")
 
     def decrypt(self, ciphertext: bytes) -> bytes:
         """Cannot decrypt hashed data."""

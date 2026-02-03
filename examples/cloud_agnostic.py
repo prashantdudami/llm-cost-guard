@@ -57,15 +57,16 @@ def example_encryption():
     except ImportError:
         print("   [Skip] cryptography package not installed")
     
-    # 3. Field-level encryption
-    print("\n3. Field-Level Encryption")
+    # 3. Field-level encryption with HMAC hashing
+    print("\n3. Field-Level Encryption (with Secure Hashing)")
     try:
         key = FernetEncryption.generate_key()
+        # Use a secure salt (at least 16 characters recommended)
         field_enc = FieldEncryption(
             provider=FernetEncryption(key),
             encrypted_fields=["metadata"],
             hashed_fields=["user_id"],
-            hash_salt="production-salt",
+            hash_salt="production-salt-16+",  # Secure salt
         )
         
         record = {
@@ -77,11 +78,12 @@ def example_encryption():
         
         encrypted_record = field_enc.encrypt_record(record)
         print(f"   Original user_id: '{record['user_id']}'")
-        print(f"   Hashed user_id: '{encrypted_record['user_id'][:40]}...'")
+        print(f"   HMAC-hashed user_id: '{encrypted_record['user_id'][:40]}...'")
         print(f"   Metadata encrypted: {encrypted_record.get('_metadata_encrypted')}")
         
         decrypted_record = field_enc.decrypt_record(encrypted_record)
         print(f"   Decrypted metadata: {decrypted_record['metadata']}")
+        print("   Note: User ID hash uses HMAC-SHA256 for security")
     except ImportError:
         print("   [Skip] cryptography package not installed")
 

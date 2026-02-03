@@ -52,7 +52,7 @@ from llm_cost_guard.metrics import (
     get_metrics_exporter,
 )
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 __all__ = [
     # Core

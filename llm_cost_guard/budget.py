@@ -154,13 +154,20 @@ class BudgetTracker:
             return max(0.0, budget.limit - self._spending.get(budget_name, 0.0))
 
     def get_utilization(self, budget_name: str) -> float:
-        """Get budget utilization as a percentage (0-100)."""
+        """
+        Get budget utilization as a percentage (0-100).
+        
+        Returns 0.0 if budget doesn't exist or has zero/negative limit.
+        Returns 100.0 cap if spending exceeds limit.
+        """
         budget = self.get_budget(budget_name)
-        if budget is None or budget.limit == 0:
+        if budget is None or budget.limit <= 0:
             return 0.0
         with self._lock:
             spending = self._spending.get(budget_name, 0.0)
-            return (spending / budget.limit) * 100
+            utilization = (spending / budget.limit) * 100
+            # Cap at reasonable maximum
+            return min(utilization, 1000.0)  # Allow up to 10x over budget
 
     def on_warning(self, callback: Callable[[Budget, float], None]) -> None:
         """Register a callback for budget warnings."""

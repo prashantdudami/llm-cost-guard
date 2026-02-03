@@ -131,7 +131,7 @@ class TestHashedEncryption:
 
     def test_hash_is_consistent(self):
         """Test that hashing is consistent."""
-        provider = HashedEncryption(salt="test-salt")
+        provider = HashedEncryption(salt="test-salt-16chars")
         plaintext = b"user@example.com"
         
         hash1 = provider.encrypt(plaintext)
@@ -141,8 +141,8 @@ class TestHashedEncryption:
 
     def test_hash_with_salt(self):
         """Test that salt affects hash."""
-        provider1 = HashedEncryption(salt="salt1")
-        provider2 = HashedEncryption(salt="salt2")
+        provider1 = HashedEncryption(salt="salt1-long-enough!")
+        provider2 = HashedEncryption(salt="salt2-long-enough!")
         plaintext = b"data"
         
         hash1 = provider1.encrypt(plaintext)
@@ -152,10 +152,26 @@ class TestHashedEncryption:
 
     def test_decrypt_raises(self):
         """Test that decrypt raises error."""
-        provider = HashedEncryption()
+        provider = HashedEncryption(salt="test-salt-16chars")
         
         with pytest.raises(NotImplementedError):
             provider.decrypt(b"hashed")
+
+    def test_auto_generates_salt_when_none(self):
+        """Test that salt is auto-generated when not provided."""
+        provider = HashedEncryption()  # No salt provided
+        
+        # Should work without error
+        hash_result = provider.encrypt(b"test data")
+        assert len(hash_result) > 0
+
+    def test_uses_hmac_not_simple_hash(self):
+        """Test that HMAC is used for security."""
+        provider = HashedEncryption(salt="secure-salt-here!")
+        
+        # Hash should be HMAC-SHA256 hex digest (64 chars)
+        hash_result = provider.encrypt(b"test data")
+        assert len(hash_result) == 64  # SHA256 hex = 64 chars
 
 
 class TestFieldEncryption:

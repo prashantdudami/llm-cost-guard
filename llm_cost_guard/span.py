@@ -96,7 +96,26 @@ class Span:
         model: str,
         record: Optional["CostRecord"] = None,
     ) -> None:
-        """Record an LLM call in this span."""
+        """
+        Record an LLM call in this span.
+        
+        Args:
+            cost: Cost of the call (must be >= 0)
+            input_tokens: Number of input tokens (must be >= 0)
+            output_tokens: Number of output tokens (must be >= 0)
+            model: Model name (must be non-empty)
+            record: Optional CostRecord to associate with this call
+        """
+        # Defensive checks - don't raise, just warn and use safe values
+        if cost < 0:
+            cost = 0.0
+        if input_tokens < 0:
+            input_tokens = 0
+        if output_tokens < 0:
+            output_tokens = 0
+        if not model:
+            model = "unknown"
+            
         with self._lock:
             self.total_cost += cost
             self.total_input_tokens += input_tokens

@@ -114,7 +114,44 @@ class RedisBackend(Backend):
     - Pessimistic reservation for distributed consistency
     - Automatic period reset via TTL
     - Cost record storage with configurable retention
+    
+    Security:
+    - Input validation on all key components
+    - Safe key construction to prevent injection
     """
+
+    # Regex for validating identifiers used in Redis keys
+    _VALID_IDENTIFIER_PATTERN = None
+
+    @classmethod
+    def _get_identifier_pattern(cls):
+        """Get compiled regex pattern for identifier validation."""
+        import re
+        if cls._VALID_IDENTIFIER_PATTERN is None:
+            cls._VALID_IDENTIFIER_PATTERN = re.compile(r'^[a-zA-Z0-9_\-]+$')
+        return cls._VALID_IDENTIFIER_PATTERN
+
+    @classmethod
+    def _validate_identifier(cls, value: str, name: str = "identifier") -> None:
+        """
+        Validate that a value is safe for use in Redis keys.
+        
+        Security: Prevents key injection attacks.
+        
+        Args:
+            value: The value to validate
+            name: Name of the parameter (for error messages)
+            
+        Raises:
+            ValueError: If the value is not safe
+        """
+        if not value or len(value) > 256:
+            raise ValueError(f"Invalid {name}: must be 1-256 characters")
+        
+        if not cls._get_identifier_pattern().match(value):
+            raise ValueError(
+                f"Invalid {name}: only alphanumeric, underscore, and hyphen allowed"
+            )
 
     def __init__(
         self,
@@ -260,6 +297,10 @@ class RedisBackend(Backend):
         Returns:
             Tuple of (allowed, effective_spending)
         """
+        # Security: Validate inputs to prevent key injection
+        self._validate_identifier(budget_name, "budget_name")
+        self._validate_identifier(reservation_id, "reservation_id")
+        
         budget_key = self._key("budget", budget_name)
         reservation_key = self._key("budget_reserved", budget_name)
         
@@ -302,6 +343,10 @@ class RedisBackend(Backend):
         Returns:
             New total spending
         """
+        # Security: Validate inputs to prevent key injection
+        self._validate_identifier(budget_name, "budget_name")
+        self._validate_identifier(reservation_id, "reservation_id")
+        
         budget_key = self._key("budget", budget_name)
         reservation_key = self._key("budget_reserved", budget_name)
         
@@ -331,6 +376,10 @@ class RedisBackend(Backend):
             reserved_amount: Amount that was reserved
             reservation_id: Reservation ID
         """
+        # Security: Validate inputs to prevent key injection
+        self._validate_identifier(budget_name, "budget_name")
+        self._validate_identifier(reservation_id, "reservation_id")
+        
         reservation_key = self._key("budget_reserved", budget_name)
         
         try:
@@ -672,4 +721,22 @@ class RedisBackend(Backend):
 
     def close(self) -> None:
         """Close the Redis connection."""
-        self._client.close()
+        try:
+            self._client.close()
+        except Exception:
+            pass  # Ignore errors during cleanup
+
+    def __enter__(self) -> "RedisBackend":
+        """Context manager entry."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Context manager exit."""
+        self.close()
+
+    def __del__(self) -> None:
+        """Destructor to ensure connection is closed."""
+        try:
+            self.close()
+        except Exception:
+            pass  # Ignore errors during cleanup

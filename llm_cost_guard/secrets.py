@@ -107,6 +107,10 @@ class FileSecretsProvider(SecretsProvider):
         provider = FileSecretsProvider(base_path="/var/secrets")
         redis_url = provider.get_secret("redis-url")
         # Reads from /var/secrets/redis-url
+    
+    Security:
+        - Path traversal protection: Keys containing '..' or absolute paths are rejected
+        - Only files within base_path can be read
     """
 
     def __init__(self, base_path: str):
@@ -116,17 +120,63 @@ class FileSecretsProvider(SecretsProvider):
         Args:
             base_path: Directory containing secret files
         """
-        self._base_path = base_path
+        self._base_path = os.path.abspath(base_path)
 
     def get_secret(self, key: str) -> Optional[str]:
-        """Read secret from file."""
-        import os
+        """
+        Read secret from file.
+        
+        Security: Validates key to prevent path traversal attacks.
+        """
+        # Security: Validate key to prevent path traversal
+        if not self._is_safe_key(key):
+            logger.warning(f"Rejected unsafe secret key: {key}")
+            return None
+        
         file_path = os.path.join(self._base_path, key)
+        
+        # Security: Double-check resolved path is within base_path
+        resolved_path = os.path.abspath(file_path)
+        if not resolved_path.startswith(self._base_path + os.sep) and resolved_path != self._base_path:
+            logger.warning(f"Path traversal attempt detected: {key}")
+            return None
+        
         try:
-            with open(file_path, "r") as f:
+            with open(resolved_path, "r") as f:
                 return f.read().strip()
         except FileNotFoundError:
             return None
+        except PermissionError:
+            logger.warning(f"Permission denied reading secret: {key}")
+            return None
+        except IOError as e:
+            logger.warning(f"Error reading secret {key}: {e}")
+            return None
+
+    @staticmethod
+    def _is_safe_key(key: str) -> bool:
+        """Validate that a key is safe (no path traversal)."""
+        # Reject empty keys
+        if not key or not key.strip():
+            return False
+        
+        # Reject absolute paths
+        if os.path.isabs(key):
+            return False
+        
+        # Reject path traversal sequences
+        if ".." in key:
+            return False
+        
+        # Reject keys with path separators (be strict)
+        if os.sep in key or "/" in key or "\\" in key:
+            return False
+        
+        # Reject null bytes
+        if "\x00" in key:
+            return False
+        
+        return True
 
 
 class VaultSecretsProvider(SecretsProvider):

@@ -196,12 +196,29 @@ class SQLiteBackend(Backend):
 
         if tags:
             for key, value in tags.items():
-                # Use JSON extraction for tag filtering
+                # Security: Validate tag key to prevent SQL injection
+                if not self._is_valid_identifier(key):
+                    raise ValueError(f"Invalid tag key: {key}")
+                # Use JSON extraction for tag filtering with validated key
                 conditions.append(f"json_extract(tags, '$.{key}') = ?")
                 params.append(value)
 
         where_clause = " AND ".join(conditions) if conditions else "1=1"
         return where_clause, params
+
+    @staticmethod
+    def _is_valid_identifier(name: str) -> bool:
+        """
+        Validate that a name is safe for use in SQL queries.
+        
+        Security: Prevents SQL injection via tag keys.
+        """
+        import re
+        # Only allow alphanumeric, underscore, hyphen
+        # Must start with letter or underscore
+        if not name or len(name) > 128:
+            return False
+        return bool(re.match(r'^[a-zA-Z_][a-zA-Z0-9_\-]*$', name))
 
     def get_records(
         self,
@@ -294,7 +311,9 @@ class SQLiteBackend(Backend):
             if field in ("provider", "model"):
                 group_columns.append(field)
             else:
-                # Assume it's a tag
+                # Assume it's a tag - validate to prevent SQL injection
+                if not self._is_valid_identifier(field):
+                    raise ValueError(f"Invalid group_by field: {field}")
                 group_columns.append(f"json_extract(tags, '$.{field}') as {field}")
 
         select_cols = ", ".join(
@@ -421,5 +440,23 @@ class SQLiteBackend(Backend):
     def close(self) -> None:
         """Close the database connection."""
         if hasattr(self._local, "conn") and self._local.conn:
-            self._local.conn.close()
+            try:
+                self._local.conn.close()
+            except Exception:
+                pass  # Ignore errors during cleanup
             self._local.conn = None
+
+    def __del__(self) -> None:
+        """Destructor to ensure connection is closed."""
+        try:
+            self.close()
+        except Exception:
+            pass  # Ignore errors during cleanup
+
+    def __enter__(self) -> "SQLiteBackend":
+        """Context manager entry."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Context manager exit."""
+        self.close()

@@ -364,7 +364,23 @@ class CostTracker:
 
         Returns:
             The created CostRecord
+            
+        Raises:
+            ValueError: If provider or model names are invalid
         """
+        # Input validation
+        self._validate_identifier(provider, "provider")
+        self._validate_identifier(model, "model")
+        
+        if input_tokens < 0:
+            raise ValueError("input_tokens must be >= 0")
+        if output_tokens < 0:
+            raise ValueError("output_tokens must be >= 0")
+        if cached_tokens < 0:
+            raise ValueError("cached_tokens must be >= 0")
+        if latency_ms < 0:
+            raise ValueError("latency_ms must be >= 0")
+        
         tags = tags or {}
         metadata = metadata or {}
 
@@ -547,25 +563,73 @@ class CostTracker:
         )
 
     def _handle_tracking_error(self, error: Exception) -> None:
-        """Handle errors during tracking based on configuration."""
+        """
+        Handle errors during tracking based on configuration.
+        
+        Behavior depends on on_tracking_failure setting:
+        - "block": Raises TrackingUnavailableError
+        - "fallback": Switches to in-memory backend
+        - "allow": Logs warning and continues
+        
+        Args:
+            error: The exception that occurred
+        """
         self._increment_metric("tracking_errors")
         self._increment_metric("backend_failures")
         
+        error_context = f"[backend={self._backend_url}] {type(error).__name__}: {error}"
+        
         if self._on_tracking_failure == "block":
-            self._audit.log_tracking_failure(str(error), self._backend_url, "blocked")
-            raise TrackingUnavailableError(str(error), self._backend_url)
+            self._audit.log_tracking_failure(error_context, self._backend_url, "blocked")
+            logger.error(f"Tracking blocked due to error: {error_context}")
+            raise TrackingUnavailableError(
+                f"Cost tracking unavailable: {error_context}",
+                self._backend_url
+            )
         elif self._on_tracking_failure == "fallback":
-            logger.warning(f"Tracking error, using fallback: {error}")
+            logger.warning(
+                f"Tracking error, switching to fallback backend: {error_context}"
+            )
             if self._fallback_backend is None:
                 self._fallback_backend = MemoryBackend()
                 self._using_fallback = True
                 self._increment_metric("fallback_activations")
                 self._audit.log_fallback_activated(
-                    self._backend_url, "memory", str(error)
+                    self._backend_url, "memory", error_context
                 )
         else:
-            logger.warning(f"Tracking error (allowing): {error}")
-            self._audit.log_tracking_failure(str(error), self._backend_url, "allowed")
+            logger.warning(f"Tracking error (continuing): {error_context}")
+            self._audit.log_tracking_failure(error_context, self._backend_url, "allowed")
+
+    @staticmethod
+    def _validate_identifier(value: str, name: str) -> None:
+        """
+        Validate that a value is a valid identifier.
+        
+        Security: Prevents injection attacks via provider/model names.
+        
+        Args:
+            value: The value to validate
+            name: Name of the parameter (for error messages)
+            
+        Raises:
+            ValueError: If the value is not valid
+        """
+        import re
+        
+        if not value or not isinstance(value, str):
+            raise ValueError(f"{name} must be a non-empty string")
+        
+        if len(value) > 256:
+            raise ValueError(f"{name} must be <= 256 characters")
+        
+        # Allow common model name patterns: alphanumeric, dash, underscore, dot, colon, slash
+        # Examples: gpt-4o, claude-3.5-sonnet, anthropic.claude-v2:1, bedrock/claude
+        if not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9_\-\.:/]*$', value):
+            raise ValueError(
+                f"Invalid {name}: must start with alphanumeric and contain only "
+                f"alphanumeric, dash, underscore, dot, colon, or slash"
+            )
 
     def _check_tag_cardinality(self, tags: Dict[str, str]) -> None:
         """Check and track tag cardinality."""

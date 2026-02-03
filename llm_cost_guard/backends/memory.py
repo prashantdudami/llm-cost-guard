@@ -250,8 +250,9 @@ class MemoryBackend(Backend):
         return True
 
     def close(self) -> None:
-        """Close the backend (no-op for memory backend)."""
-        pass
+        """Close the backend (clears memory)."""
+        with self._lock:
+            self._records.clear()
 
     def clear(self) -> None:
         """Clear all records."""
@@ -263,3 +264,11 @@ class MemoryBackend(Backend):
         """Get the current number of records."""
         with self._lock:
             return len(self._records)
+
+    def __enter__(self) -> "MemoryBackend":
+        """Context manager entry."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Context manager exit."""
+        self.close()

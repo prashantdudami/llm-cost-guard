@@ -10,6 +10,7 @@ Provides compliance-ready audit trails for:
 
 import json
 import logging
+import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
@@ -163,15 +164,41 @@ class FileAuditBackend(AuditBackend):
     
     Suitable for compliance requirements where audit logs need
     to be stored in a specific location.
+    
+    Security:
+    - Uses file locking for thread-safe concurrent writes
+    - Atomic append operations
     """
     
     def __init__(self, file_path: str):
         self._file_path = file_path
+        self._lock = threading.Lock()
     
     def log(self, event: AuditEvent) -> None:
-        """Log an audit event."""
-        with open(self._file_path, "a") as f:
-            f.write(event.to_json() + "\n")
+        """
+        Log an audit event.
+        
+        Thread-safe: Uses locking for concurrent access.
+        """
+        import fcntl
+        import os
+        
+        line = event.to_json() + "\n"
+        
+        with self._lock:
+            try:
+                # Open file for appending
+                with open(self._file_path, "a") as f:
+                    # Use file locking for process-level safety
+                    try:
+                        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+                        f.write(line)
+                        f.flush()
+                        os.fsync(f.fileno())  # Ensure write is durable
+                    finally:
+                        fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+            except (OSError, IOError) as e:
+                logger.error(f"Failed to write audit log: {e}")
     
     def query(
         self,

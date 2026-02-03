@@ -68,6 +68,34 @@ class TestCostTrackerBasic:
         assert last is not None
         assert last.model == "gpt-4o"
 
+    def test_record_rejects_invalid_provider(self):
+        """Test that invalid provider names are rejected."""
+        tracker = CostTracker()
+        
+        with pytest.raises(ValueError, match="provider"):
+            tracker.record(
+                provider="",  # Empty
+                model="gpt-4o",
+                input_tokens=100,
+                output_tokens=50,
+            )
+        
+        tracker.close()
+
+    def test_record_rejects_negative_tokens(self):
+        """Test that negative token counts are rejected."""
+        tracker = CostTracker()
+        
+        with pytest.raises(ValueError, match="input_tokens must be >= 0"):
+            tracker.record(
+                provider="openai",
+                model="gpt-4o",
+                input_tokens=-1,
+                output_tokens=50,
+            )
+        
+        tracker.close()
+
     def test_get_costs(self, tracker):
         """Test get_costs() returns a report."""
         tracker.record(

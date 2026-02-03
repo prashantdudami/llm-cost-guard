@@ -23,18 +23,34 @@ class RateLimit:
 
 
 class SlidingWindowCounter:
-    """Sliding window rate limiter implementation."""
+    """
+    Sliding window rate limiter implementation.
+    
+    Thread-safe with memory-bounded storage.
+    """
+    
+    # Maximum requests to store to prevent memory issues
+    MAX_STORED_REQUESTS = 100000
 
     def __init__(self, window_size_seconds: float, limit: int):
+        if window_size_seconds <= 0:
+            raise ValueError("window_size_seconds must be > 0")
+        if limit <= 0:
+            raise ValueError("limit must be > 0")
+            
         self._window_size = window_size_seconds
         self._limit = limit
         self._requests: List[float] = []
         self._lock = threading.Lock()
 
     def _cleanup(self, now: float) -> None:
-        """Remove expired entries."""
+        """Remove expired entries and enforce memory bound."""
         cutoff = now - self._window_size
         self._requests = [t for t in self._requests if t > cutoff]
+        
+        # Memory safety: truncate if too many requests
+        if len(self._requests) > self.MAX_STORED_REQUESTS:
+            self._requests = self._requests[-self.MAX_STORED_REQUESTS:]
 
     def check(self) -> Tuple[bool, int, Optional[float]]:
         """

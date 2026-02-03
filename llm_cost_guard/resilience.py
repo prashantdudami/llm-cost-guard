@@ -206,15 +206,25 @@ def retry_with_backoff(
             return requests.get("https://api.example.com")
     
     Args:
-        max_attempts: Maximum number of attempts
-        initial_delay: Initial delay in seconds
-        max_delay: Maximum delay in seconds
-        exponential_base: Base for exponential backoff
+        max_attempts: Maximum number of attempts (must be >= 1)
+        initial_delay: Initial delay in seconds (must be > 0)
+        max_delay: Maximum delay in seconds (must be > 0)
+        exponential_base: Base for exponential backoff (must be > 1)
         jitter: Add random jitter to delays
         retryable_exceptions: Exception types to retry
         on_retry: Callback called on each retry (exception, attempt)
     """
-    import random
+    import secrets as secrets_module
+    
+    # Validate parameters
+    if max_attempts < 1:
+        raise ValueError("max_attempts must be >= 1")
+    if initial_delay <= 0:
+        raise ValueError("initial_delay must be > 0")
+    if max_delay <= 0:
+        raise ValueError("max_delay must be > 0")
+    if exponential_base <= 1:
+        raise ValueError("exponential_base must be > 1")
     
     def decorator(func: Callable) -> Callable:
         @wraps(func)
@@ -236,9 +246,11 @@ def retry_with_backoff(
                         max_delay
                     )
                     
-                    # Add jitter
+                    # Add jitter using cryptographically secure random
                     if jitter:
-                        delay = delay * (0.5 + random.random())
+                        # Generate random float between 0.5 and 1.0
+                        jitter_factor = 0.5 + (secrets_module.randbelow(1000) / 2000.0)
+                        delay = delay * jitter_factor
                     
                     logger.warning(
                         f"Attempt {attempt}/{max_attempts} failed: {e}. "

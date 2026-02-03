@@ -126,12 +126,39 @@ class PricingLoader:
     ) -> tuple[float, float, float]:
         """
         Calculate cost for a call.
-        Returns (input_cost, output_cost, total_cost).
+        
+        Args:
+            provider: Provider name (e.g., "openai", "anthropic")
+            model: Model name (e.g., "gpt-4o", "claude-3-sonnet")
+            input_tokens: Number of input tokens (must be >= 0)
+            output_tokens: Number of output tokens (must be >= 0)
+            cached_tokens: Number of cached input tokens (must be >= 0)
+            
+        Returns:
+            Tuple of (input_cost, output_cost, total_cost)
+            
+        Raises:
+            ValueError: If any token count is negative
+            PricingNotFoundError: If pricing not found for model
         """
+        # Validate inputs
+        if input_tokens < 0:
+            raise ValueError(f"input_tokens must be >= 0, got {input_tokens}")
+        if output_tokens < 0:
+            raise ValueError(f"output_tokens must be >= 0, got {output_tokens}")
+        if cached_tokens < 0:
+            raise ValueError(f"cached_tokens must be >= 0, got {cached_tokens}")
+        if cached_tokens > input_tokens:
+            logger.warning(
+                f"cached_tokens ({cached_tokens}) > input_tokens ({input_tokens}), "
+                "capping to input_tokens"
+            )
+            cached_tokens = input_tokens
+            
         pricing = self.get_pricing(provider, model)
 
         # Calculate input cost (considering cache)
-        regular_input_tokens = input_tokens - cached_tokens
+        regular_input_tokens = max(0, input_tokens - cached_tokens)
         input_cost = (regular_input_tokens / 1000) * pricing.input_cost_per_1k
 
         # Add cached token cost if applicable
