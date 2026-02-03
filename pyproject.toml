@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "llm-cost-guard"
-version = "0.1.1"
+version = "0.1.2"
 description = "Real-time cost tracking, budget enforcement, and usage analytics for LLM applications"
 readme = "README.md"
 license = "MIT"
@@ -69,6 +69,7 @@ Homepage = "https://github.com/prashantdudami/llm-cost-guard"
 Documentation = "https://github.com/prashantdudami/llm-cost-guard#readme"
 Repository = "https://github.com/prashantdudami/llm-cost-guard"
 Issues = "https://github.com/prashantdudami/llm-cost-guard/issues"
+Author = "https://www.prashantdudami.com/"
 
 [tool.hatch.build.targets.wheel]
 packages = ["llm_cost_guard"]

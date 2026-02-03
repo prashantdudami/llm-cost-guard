@@ -296,7 +296,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## Author
 
-**Prashant Dudami**
+**Prashant Dudami** - AI/ML Architect & LLM Infrastructure Expert
+- Website: [prashantdudami.com](https://www.prashantdudami.com/)
 - LinkedIn: [linkedin.com/in/prashantdudami](https://www.linkedin.com/in/prashantdudami/)
 - GitHub: [github.com/prashantdudami](https://github.com/prashantdudami)
-- Email: prashant.dudami@gmail.com
