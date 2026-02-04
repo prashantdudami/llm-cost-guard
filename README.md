@@ -14,7 +14,11 @@ Real-time cost tracking, budget enforcement, and usage analytics for LLM applica
 - **LangChain Integration**: Native callback support for LangChain applications
 - **Rate Limiting**: Control request rates per model, provider, or custom tags
 - **Hierarchical Tracking**: Group related LLM calls with spans
-- **Flexible Storage**: In-memory, SQLite, PostgreSQL, Redis, DynamoDB backends
+- **Flexible Storage**: In-memory, SQLite, Redis backends
+- **Encryption at Rest**: Field-level encryption with Fernet + HMAC-SHA256
+- **Secrets Management**: Vault, K8s secrets, env vars with fallback chains
+- **Resilience Patterns**: Circuit breaker, retry with exponential backoff
+- **Metrics Export**: Prometheus, StatsD, OpenTelemetry compatible
 - **Zero External Dependencies**: Works offline with no external services required
 
 ## Installation
@@ -32,7 +36,22 @@ pip install llm-cost-guard[langchain]
 # AWS Bedrock support
 pip install llm-cost-guard[bedrock]
 
-# All optional dependencies
+# Encryption support
+pip install llm-cost-guard[encryption]
+
+# Redis distributed backend
+pip install llm-cost-guard[redis]
+
+# HashiCorp Vault secrets
+pip install llm-cost-guard[vault]
+
+# Prometheus metrics
+pip install llm-cost-guard[prometheus]
+
+# All cloud-agnostic features (encryption, prometheus, redis)
+pip install llm-cost-guard[full]
+
+# All features including cloud providers
 pip install llm-cost-guard[all]
 ```
 
@@ -257,18 +276,119 @@ report = tracker.get_costs(
 df = tracker.to_dataframe()
 ```
 
-## Security
+## Security & Encryption (v0.3.0+)
+
+Enterprise-grade security with cloud-agnostic encryption:
+
+### Field-Level Encryption
+
+```python
+from llm_cost_guard import FernetEncryption, FieldEncryption
+
+# Generate a key (store securely!)
+key = FernetEncryption.generate_key()
+
+# Encrypt sensitive fields, hash PII
+field_enc = FieldEncryption(
+    provider=FernetEncryption(key),
+    encrypted_fields=["metadata", "tags"],  # Reversible
+    hashed_fields=["user_id"],              # HMAC-SHA256 (one-way)
+    hash_salt="your-secure-salt-16chars+",
+)
+
+# Encrypt before storage
+encrypted_record = field_enc.encrypt_record(record_dict)
+# Decrypt when reading
+decrypted_record = field_enc.decrypt_record(encrypted_record)
+```
+
+### Secrets Management
+
+```python
+from llm_cost_guard import (
+    EnvironmentSecretsProvider,
+    FileSecretsProvider,
+    VaultSecretsProvider,
+    CompositeSecretsProvider,
+)
+
+# Chain multiple providers with fallback
+secrets = CompositeSecretsProvider([
+    VaultSecretsProvider(url="https://vault.example.com"),
+    FileSecretsProvider(base_path="/var/secrets"),  # K8s mounted
+    EnvironmentSecretsProvider(prefix="LLM_"),      # Fallback
+])
+
+redis_url = secrets.get_secret("REDIS_URL")
+encryption_key = secrets.get_secret_required("ENCRYPTION_KEY")
+```
+
+### Security Features
 
 - **No API key logging**: Keys are never stored, logged, or transmitted
 - **No prompt storage by default**: Only metadata (tokens, cost) stored
-- **PII redaction**: Optional redaction for user IDs
-- **Encryption support**: For SQL/Redis backends
+- **Path traversal protection**: File-based secrets validated against injection
+- **SQL injection prevention**: All inputs validated before query construction
+- **HMAC-SHA256 hashing**: Secure one-way hashing for PII fields
 
 ```python
 tracker = CostTracker(
     store_prompts=False,          # Default: never store prompts
-    redact_user_ids=True,         # Hash user IDs in storage
 )
+```
+
+## Resilience Patterns (v0.3.0+)
+
+Built-in circuit breaker and retry patterns for production reliability:
+
+### Circuit Breaker
+
+```python
+from llm_cost_guard import CircuitBreaker
+
+breaker = CircuitBreaker(
+    failure_threshold=5,   # Open after 5 failures
+    success_threshold=2,   # Close after 2 successes in half-open
+    timeout=30.0,          # Seconds before trying again
+)
+
+@breaker
+def call_llm_api():
+    return client.chat.completions.create(...)
+
+# Check state
+print(breaker.state)  # CircuitState.CLOSED / OPEN / HALF_OPEN
+```
+
+### Retry with Exponential Backoff
+
+```python
+from llm_cost_guard import retry_with_backoff
+
+@retry_with_backoff(
+    max_attempts=3,
+    initial_delay=1.0,
+    max_delay=60.0,
+    exponential_base=2.0,
+    jitter=True,
+)
+def call_llm_api():
+    return client.chat.completions.create(...)
+```
+
+### Combined Resilience
+
+```python
+from llm_cost_guard import ResilientOperation, CircuitBreaker, RetryConfig
+
+resilient = ResilientOperation(
+    circuit_breaker=CircuitBreaker(failure_threshold=5),
+    retry_config=RetryConfig(max_attempts=3),
+)
+
+@resilient
+def call_llm_api():
+    return client.chat.completions.create(...)
 ```
 
 ## Audit Logging (v0.2.0+)
@@ -322,6 +442,36 @@ print(health.healthy)  # True/False
 print(health.errors)   # List of issues
 ```
 
+### Metrics Exporters (v0.3.0+)
+
+Export metrics to your observability stack:
+
+```python
+from llm_cost_guard import (
+    PrometheusExporter,
+    StatsDExporter,
+    CompositeExporter,
+    LoggingExporter,
+)
+
+# Prometheus (exposes /metrics endpoint)
+exporter = PrometheusExporter(port=9090, prefix="llm_cost_guard")
+
+# StatsD
+exporter = StatsDExporter(host="localhost", port=8125)
+
+# Multiple exporters
+exporter = CompositeExporter([
+    PrometheusExporter(port=9090),
+    LoggingExporter(),  # Debug logging
+])
+
+# Record metrics
+exporter.counter("requests_total", 1, tags={"model": "gpt-4o"})
+exporter.histogram("cost_dollars", 0.05, tags={"provider": "openai"})
+exporter.gauge("budget_utilization", 75.5, tags={"budget": "daily"})
+```
+
 ## Custom Pricing
 
 For negotiated enterprise rates:
@@ -346,9 +496,13 @@ Being transparent about what's not yet production-ready:
 | Distributed budgets (Redis) | ✅ v0.2.0 | Atomic operations with Lua scripts |
 | Audit logging | ✅ v0.2.0 | File and logging backends |
 | Graceful degradation metrics | ✅ v0.2.0 | Track failures and fallbacks |
+| Encryption at rest | ✅ v0.3.0 | Fernet + HMAC-SHA256 field encryption |
+| Secrets management | ✅ v0.3.0 | Vault, K8s, env vars with fallback |
+| Circuit breaker & retry | ✅ v0.3.0 | Cloud-agnostic resilience patterns |
+| Prometheus/StatsD metrics | ✅ v0.3.0 | Export to observability stack |
+| Security hardening | ✅ v0.3.1 | SQL injection, path traversal protection |
 | PostgreSQL backend | 🚧 Planned | Use SQLite or Redis for now |
 | DynamoDB backend | 🚧 Planned | Use SQLite or Redis for now |
-| Encryption at rest | 🚧 Planned | Use encrypted volumes as workaround |
 | Multi-tenancy optimization | 🚧 Planned | Use tag-scoped budgets for now |
 | Streaming cost estimation | ⚠️ Limited | Actual cost tracked on completion |
 | Fine-tuning cost tracking | ❌ Not supported | |
