@@ -27,7 +27,7 @@ class AnthropicProvider(Provider):
 
             # Check for cached tokens
             usage.cached_tokens = usage_data.get("cache_read_input_tokens", 0)
-            cache_creation = usage_data.get("cache_creation_input_tokens", 0)
+            usage_data.get("cache_creation_input_tokens", 0)
 
             # Total tokens
             usage.total_tokens = usage.input_tokens + usage.output_tokens

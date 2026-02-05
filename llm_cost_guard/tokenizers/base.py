@@ -2,8 +2,8 @@
 Token counting utilities for LLM Cost Guard.
 """
 
-from typing import Any, Dict, List, Optional, Union
 import logging
+from typing import Any, Optional, Union
 
 logger = logging.getLogger(__name__)
 
@@ -12,14 +12,14 @@ class TokenCounter:
     """Token counter with support for multiple providers."""
 
     def __init__(self):
-        self._tiktoken_encodings: Dict[str, Any] = {}
+        self._tiktoken_encodings: dict[str, Any] = {}
         self._tiktoken_available = False
         self._check_tiktoken()
 
     def _check_tiktoken(self) -> None:
         """Check if tiktoken is available."""
         try:
-            import tiktoken
+            import tiktoken  # noqa: F401
 
             self._tiktoken_available = True
         except ImportError:
@@ -51,7 +51,7 @@ class TokenCounter:
 
     def count_tokens(
         self,
-        text: Union[str, List[Dict[str, str]]],
+        text: Union[str, list[dict[str, str]]],
         model: str,
         provider: str = "openai",
     ) -> int:
@@ -86,7 +86,7 @@ class TokenCounter:
         return self._estimate_tokens(text)
 
     def _count_message_tokens(
-        self, messages: List[Dict[str, str]], model: str, provider: str
+        self, messages: list[dict[str, str]], model: str, provider: str
     ) -> int:
         """Count tokens in a list of messages."""
         if provider == "openai" and self._tiktoken_available:
@@ -109,7 +109,7 @@ class TokenCounter:
         return total
 
     def _count_openai_message_tokens(
-        self, messages: List[Dict[str, str]], model: str
+        self, messages: list[dict[str, str]], model: str
     ) -> int:
         """Count tokens for OpenAI chat messages."""
         encoding = self._get_tiktoken_encoding(model)
@@ -139,7 +139,7 @@ class TokenCounter:
         num_tokens += 3  # Every reply is primed with <|start|>assistant<|message|>
         return num_tokens
 
-    def _count_anthropic_message_tokens(self, messages: List[Dict[str, str]]) -> int:
+    def _count_anthropic_message_tokens(self, messages: list[dict[str, str]]) -> int:
         """Estimate tokens for Anthropic messages."""
         # Anthropic doesn't provide a public tokenizer
         # Use estimation based on character count
@@ -165,7 +165,7 @@ class TokenCounter:
         # This is a common approximation used when tokenizers aren't available
         return max(1, len(text) // 4)
 
-    def _estimate_message_tokens(self, messages: List[Dict[str, str]]) -> int:
+    def _estimate_message_tokens(self, messages: list[dict[str, str]]) -> int:
         """Estimate tokens for a list of messages."""
         total = 0
         for msg in messages:
@@ -189,7 +189,7 @@ def get_token_counter() -> TokenCounter:
 
 
 def count_tokens(
-    text: Union[str, List[Dict[str, str]]],
+    text: Union[str, list[dict[str, str]]],
     model: str,
     provider: str = "openai",
 ) -> int:

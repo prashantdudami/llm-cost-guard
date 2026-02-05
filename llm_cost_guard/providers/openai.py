@@ -2,7 +2,7 @@
 OpenAI provider for LLM Cost Guard.
 """
 
-from typing import Any, Optional
+from typing import Any
 
 from llm_cost_guard.models import UsageData
 from llm_cost_guard.providers.base import Provider

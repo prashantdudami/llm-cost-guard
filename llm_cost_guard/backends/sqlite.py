@@ -4,10 +4,9 @@ SQLite storage backend for LLM Cost Guard.
 
 import json
 import sqlite3
-from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List, Optional
 import threading
+from datetime import datetime
+from typing import Any, Optional
 
 from llm_cost_guard.backends.base import Backend
 from llm_cost_guard.models import CostRecord, CostReport, ModelType
@@ -154,7 +153,7 @@ class SQLiteBackend(Backend):
 
         conn.commit()
 
-    def save_records(self, records: List[CostRecord]) -> None:
+    def save_records(self, records: list[CostRecord]) -> None:
         """Save multiple cost records."""
         if not records:
             return
@@ -180,7 +179,7 @@ class SQLiteBackend(Backend):
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
     ) -> tuple[str, list]:
         """Build WHERE clause and parameters."""
         conditions = []
@@ -210,7 +209,7 @@ class SQLiteBackend(Backend):
     def _is_valid_identifier(name: str) -> bool:
         """
         Validate that a name is safe for use in SQL queries.
-        
+
         Security: Prevents SQL injection via tag keys.
         """
         import re
@@ -224,10 +223,10 @@ class SQLiteBackend(Backend):
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
         limit: Optional[int] = None,
         offset: int = 0,
-    ) -> List[CostRecord]:
+    ) -> list[CostRecord]:
         """Retrieve cost records with optional filters."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -254,7 +253,7 @@ class SQLiteBackend(Backend):
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
     ) -> float:
         """Get total cost for the given filters."""
         conn = self._get_connection()
@@ -274,9 +273,9 @@ class SQLiteBackend(Backend):
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        tags: Optional[Dict[str, str]] = None,
-        group_by: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        tags: Optional[dict[str, str]] = None,
+        group_by: Optional[list[str]] = None,
+    ) -> dict[str, Any]:
         """Get aggregated costs grouped by specified fields."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -316,7 +315,7 @@ class SQLiteBackend(Backend):
                     raise ValueError(f"Invalid group_by field: {field}")
                 group_columns.append(f"json_extract(tags, '$.{field}') as {field}")
 
-        select_cols = ", ".join(
+        ", ".join(
             [f if " as " not in f else f.split(" as ")[1] for f in group_columns]
         )
         group_cols = ", ".join(
@@ -357,8 +356,8 @@ class SQLiteBackend(Backend):
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        tags: Optional[Dict[str, str]] = None,
-        group_by: Optional[List[str]] = None,
+        tags: Optional[dict[str, str]] = None,
+        group_by: Optional[list[str]] = None,
     ) -> CostReport:
         """Generate a cost report."""
         conn = self._get_connection()
@@ -413,7 +412,7 @@ class SQLiteBackend(Backend):
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
     ) -> int:
         """Delete records matching the filters."""
         conn = self._get_connection()

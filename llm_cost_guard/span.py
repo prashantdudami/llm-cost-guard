@@ -2,12 +2,12 @@
 Hierarchical tracking spans for LLM Cost Guard.
 """
 
-from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
 import contextvars
 import threading
 import uuid
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from llm_cost_guard.models import CostRecord
@@ -28,19 +28,19 @@ class Span:
     parent_id: Optional[str] = None
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
-    tags: Dict[str, str] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    tags: dict[str, str] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     # Aggregated metrics
     total_cost: float = 0.0
     total_input_tokens: int = 0
     total_output_tokens: int = 0
     call_count: int = 0
-    models_used: Set[str] = field(default_factory=set)
+    models_used: set[str] = field(default_factory=set)
 
     # Hierarchy
-    children: List["Span"] = field(default_factory=list)
-    _records: List["CostRecord"] = field(default_factory=list)
+    children: list["Span"] = field(default_factory=list)
+    _records: list["CostRecord"] = field(default_factory=list)
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
     # For context management
@@ -98,7 +98,7 @@ class Span:
     ) -> None:
         """
         Record an LLM call in this span.
-        
+
         Args:
             cost: Cost of the call (must be >= 0)
             input_tokens: Number of input tokens (must be >= 0)
@@ -115,7 +115,7 @@ class Span:
             output_tokens = 0
         if not model:
             model = "unknown"
-            
+
         with self._lock:
             self.total_cost += cost
             self.total_input_tokens += input_tokens
@@ -134,11 +134,11 @@ class Span:
         return int(delta.total_seconds() * 1000)
 
     @property
-    def records(self) -> List["CostRecord"]:
+    def records(self) -> list["CostRecord"]:
         """Get all records in this span."""
         return list(self._records)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert span to dictionary."""
         return {
             "name": self.name,

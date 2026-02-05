@@ -3,7 +3,7 @@ Wrapped Anthropic client with automatic cost tracking.
 """
 
 import time
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from llm_cost_guard import CostTracker
@@ -31,7 +31,7 @@ class TrackedAnthropic:
         self,
         tracker: "CostTracker",
         client: Optional[Any] = None,
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
         **anthropic_kwargs: Any,
     ):
         """
@@ -72,7 +72,7 @@ class TrackedAnthropic:
 class _TrackedMessages:
     """Wrapped messages API."""
 
-    def __init__(self, messages, tracker: "CostTracker", default_tags: Dict[str, str]):
+    def __init__(self, messages, tracker: "CostTracker", default_tags: dict[str, str]):
         self._messages = messages
         self._tracker = tracker
         self._default_tags = default_tags
@@ -80,7 +80,7 @@ class _TrackedMessages:
     def create(
         self,
         *,
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
         **kwargs: Any,
     ) -> Any:
         """Create a message with tracking."""
@@ -108,7 +108,7 @@ class _TrackedMessages:
         self,
         response: Any,
         model_hint: Optional[str],
-        tags: Optional[Dict[str, str]],
+        tags: Optional[dict[str, str]],
         success: bool,
         error_type: Optional[str],
         latency_ms: int,
@@ -142,7 +142,7 @@ class _TrackedMessages:
     def stream(
         self,
         *,
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
         **kwargs: Any,
     ) -> Any:
         """Create a streaming message with tracking."""
@@ -169,8 +169,8 @@ class _TrackedStream:
         self,
         stream: Any,
         tracker: "CostTracker",
-        default_tags: Dict[str, str],
-        tags: Optional[Dict[str, str]],
+        default_tags: dict[str, str],
+        tags: Optional[dict[str, str]],
         model_hint: Optional[str],
         start_time: float,
     ):

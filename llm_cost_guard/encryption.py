@@ -9,7 +9,7 @@ import hashlib
 import json
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class EncryptionProvider(ABC):
     """
     Abstract encryption provider.
-    
+
     Implement this interface for any encryption backend:
     - Local: Fernet (default)
     - AWS: KMS
@@ -46,12 +46,12 @@ class EncryptionProvider(ABC):
         encrypted = base64.b64decode(ciphertext.encode("utf-8"))
         return self.decrypt(encrypted).decode("utf-8")
 
-    def encrypt_dict(self, data: Dict[str, Any]) -> str:
+    def encrypt_dict(self, data: dict[str, Any]) -> str:
         """Encrypt a dictionary as JSON."""
         json_str = json.dumps(data, default=str)
         return self.encrypt_string(json_str)
 
-    def decrypt_dict(self, ciphertext: str) -> Dict[str, Any]:
+    def decrypt_dict(self, ciphertext: str) -> dict[str, Any]:
         """Decrypt a dictionary from encrypted JSON."""
         json_str = self.decrypt_string(ciphertext)
         return json.loads(json_str)
@@ -60,7 +60,7 @@ class EncryptionProvider(ABC):
 class NoEncryption(EncryptionProvider):
     """
     No encryption (passthrough).
-    
+
     Use for development/testing or when encryption is handled
     at the storage layer (encrypted volumes, etc.).
     """
@@ -75,14 +75,14 @@ class NoEncryption(EncryptionProvider):
 class FernetEncryption(EncryptionProvider):
     """
     Local encryption using Fernet (symmetric encryption).
-    
+
     Cloud-agnostic - works anywhere without external dependencies.
-    
+
     Usage:
         # Generate a key (do this once, store securely)
         from cryptography.fernet import Fernet
         key = Fernet.generate_key()
-        
+
         # Use the key
         provider = FernetEncryption(key)
         encrypted = provider.encrypt(b"sensitive data")
@@ -91,7 +91,7 @@ class FernetEncryption(EncryptionProvider):
     def __init__(self, key: bytes):
         """
         Initialize with a Fernet key.
-        
+
         Args:
             key: 32-byte URL-safe base64-encoded key.
                  Generate with: Fernet.generate_key()
@@ -103,7 +103,7 @@ class FernetEncryption(EncryptionProvider):
                 "cryptography package required for FernetEncryption. "
                 "Install with: pip install llm-cost-guard[encryption]"
             )
-        
+
         self._fernet = Fernet(key)
 
     def encrypt(self, plaintext: bytes) -> bytes:
@@ -122,10 +122,10 @@ class FernetEncryption(EncryptionProvider):
 class HashedEncryption(EncryptionProvider):
     """
     One-way hashing for PII fields (not reversible).
-    
+
     Use for fields like user_id where you need consistency
     but don't need to recover the original value.
-    
+
     Security:
         - Uses HMAC-SHA256 for secure hashing
         - Salt is required and must be at least 16 bytes
@@ -137,17 +137,16 @@ class HashedEncryption(EncryptionProvider):
     def __init__(self, salt: Optional[str] = None):
         """
         Initialize with a salt.
-        
+
         Args:
             salt: Salt for hashing. If not provided, generates a random salt.
                   For consistency across restarts, provide a fixed salt.
-                  
+
         Security:
             Salt should be at least 16 characters for security.
         """
-        import hmac
         import secrets as secrets_module
-        
+
         if salt is None:
             # Generate a secure random salt
             self._salt = secrets_module.token_bytes(32)
@@ -162,7 +161,7 @@ class HashedEncryption(EncryptionProvider):
                     f"HashedEncryption: Salt should be at least {self.MIN_SALT_LENGTH} bytes. "
                     f"Current salt is {len(self._salt)} bytes."
                 )
-        
+
         self._hmac_key = self._salt
 
     def encrypt(self, plaintext: bytes) -> bytes:
@@ -170,8 +169,8 @@ class HashedEncryption(EncryptionProvider):
         import hmac
         # Use HMAC for secure keyed hashing
         return hmac.new(
-            self._hmac_key, 
-            plaintext, 
+            self._hmac_key,
+            plaintext,
             hashlib.sha256
         ).hexdigest().encode("utf-8")
 
@@ -183,9 +182,9 @@ class HashedEncryption(EncryptionProvider):
 class FieldEncryption:
     """
     Field-level encryption for CostRecord fields.
-    
+
     Encrypts specified fields while leaving others in plaintext.
-    
+
     Usage:
         field_enc = FieldEncryption(
             provider=FernetEncryption(key),
@@ -203,7 +202,7 @@ class FieldEncryption:
     ):
         """
         Initialize field encryption.
-        
+
         Args:
             provider: Encryption provider for reversible encryption
             encrypted_fields: List of field names to encrypt
@@ -215,10 +214,10 @@ class FieldEncryption:
         self._hashed_fields = set(hashed_fields or [])
         self._hasher = HashedEncryption(salt=hash_salt)
 
-    def encrypt_record(self, record: Dict[str, Any]) -> Dict[str, Any]:
+    def encrypt_record(self, record: dict[str, Any]) -> dict[str, Any]:
         """Encrypt specified fields in a record."""
         result = dict(record)
-        
+
         for field in self._encrypted_fields:
             if field in result and result[field] is not None:
                 value = result[field]
@@ -229,19 +228,19 @@ class FieldEncryption:
                 else:
                     result[field] = self._provider.encrypt_string(str(value))
                 result[f"_{field}_encrypted"] = True
-        
+
         for field in self._hashed_fields:
             if field in result and result[field] is not None:
                 value = str(result[field])
                 result[field] = self._hasher.encrypt(value.encode()).decode()
                 result[f"_{field}_hashed"] = True
-        
+
         return result
 
-    def decrypt_record(self, record: Dict[str, Any]) -> Dict[str, Any]:
+    def decrypt_record(self, record: dict[str, Any]) -> dict[str, Any]:
         """Decrypt specified fields in a record."""
         result = dict(record)
-        
+
         for field in self._encrypted_fields:
             if result.get(f"_{field}_encrypted") and field in result:
                 try:
@@ -251,12 +250,12 @@ class FieldEncryption:
                     # Fall back to string
                     result[field] = self._provider.decrypt_string(result[field])
                 del result[f"_{field}_encrypted"]
-        
+
         # Hashed fields cannot be decrypted
         for field in self._hashed_fields:
             if f"_{field}_hashed" in result:
                 del result[f"_{field}_hashed"]
-        
+
         return result
 
 
@@ -266,23 +265,23 @@ def get_encryption_provider(
 ) -> EncryptionProvider:
     """
     Factory function to create encryption providers.
-    
+
     Args:
         provider_type: One of "none", "fernet", "aws_kms", "gcp_kms", "azure_kv"
         **kwargs: Provider-specific configuration
-        
+
     Returns:
         EncryptionProvider instance
     """
     if provider_type == "none":
         return NoEncryption()
-    
+
     if provider_type == "fernet":
         key = kwargs.get("key")
         if not key:
             raise ValueError("FernetEncryption requires 'key' parameter")
         return FernetEncryption(key)
-    
+
     if provider_type == "aws_kms":
         # Lazy import to avoid dependency
         try:
@@ -293,7 +292,7 @@ def get_encryption_provider(
                 "AWS KMS encryption requires boto3. "
                 "Install with: pip install llm-cost-guard[aws]"
             )
-    
+
     if provider_type == "gcp_kms":
         try:
             from llm_cost_guard.encryption_gcp import GCPKMSEncryption
@@ -303,7 +302,7 @@ def get_encryption_provider(
                 "GCP KMS encryption requires google-cloud-kms. "
                 "Install with: pip install llm-cost-guard[gcp]"
             )
-    
+
     if provider_type == "azure_kv":
         try:
             from llm_cost_guard.encryption_azure import AzureKeyVaultEncryption
@@ -313,5 +312,5 @@ def get_encryption_provider(
                 "Azure Key Vault encryption requires azure-keyvault-keys. "
                 "Install with: pip install llm-cost-guard[azure]"
             )
-    
+
     raise ValueError(f"Unknown encryption provider: {provider_type}")

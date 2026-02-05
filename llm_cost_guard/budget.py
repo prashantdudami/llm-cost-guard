@@ -2,12 +2,12 @@
 Budget enforcement for LLM Cost Guard.
 """
 
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from enum import Enum
-from typing import Any, Callable, Dict, List, Literal, Optional
 import logging
 import threading
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Callable, Literal, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -32,11 +32,11 @@ class Budget:
     limit: float
     period: BudgetPeriod = "day"
     action: BudgetAction = BudgetAction.WARN
-    tags: Optional[Dict[str, str]] = None
+    tags: Optional[dict[str, str]] = None
     warning_threshold: float = 0.8  # Warn at 80%
     callback: Optional[Callable[["Budget", float], None]] = None
 
-    def matches_tags(self, call_tags: Dict[str, str]) -> bool:
+    def matches_tags(self, call_tags: dict[str, str]) -> bool:
         """Check if this budget applies to the given tags."""
         if self.tags is None:
             return True
@@ -49,13 +49,13 @@ class Budget:
 class BudgetTracker:
     """Tracks spending against budgets."""
 
-    def __init__(self, budgets: Optional[List[Budget]] = None):
+    def __init__(self, budgets: Optional[list[Budget]] = None):
         self._budgets = budgets or []
-        self._spending: Dict[str, float] = {}  # budget_name -> current spending
-        self._period_start: Dict[str, datetime] = {}  # budget_name -> period start
+        self._spending: dict[str, float] = {}  # budget_name -> current spending
+        self._period_start: dict[str, datetime] = {}  # budget_name -> period start
         self._lock = threading.Lock()
-        self._warning_callbacks: List[Callable[[Budget, float], None]] = []
-        self._exceeded_callbacks: List[Callable[[Budget], None]] = []
+        self._warning_callbacks: list[Callable[[Budget, float], None]] = []
+        self._exceeded_callbacks: list[Callable[[Budget], None]] = []
 
         # Initialize budget tracking
         now = datetime.now()
@@ -136,7 +136,7 @@ class BudgetTracker:
                 return budget
         return None
 
-    def get_all_budgets(self) -> List[Budget]:
+    def get_all_budgets(self) -> list[Budget]:
         """Get all budgets."""
         return list(self._budgets)
 
@@ -156,7 +156,7 @@ class BudgetTracker:
     def get_utilization(self, budget_name: str) -> float:
         """
         Get budget utilization as a percentage (0-100).
-        
+
         Returns 0.0 if budget doesn't exist or has zero/negative limit.
         Returns 100.0 cap if spending exceeds limit.
         """
@@ -178,8 +178,8 @@ class BudgetTracker:
         self._exceeded_callbacks.append(callback)
 
     def check_budget(
-        self, cost: float, tags: Optional[Dict[str, str]] = None
-    ) -> List[tuple[Budget, BudgetAction]]:
+        self, cost: float, tags: Optional[dict[str, str]] = None
+    ) -> list[tuple[Budget, BudgetAction]]:
         """
         Check if adding a cost would exceed any budgets.
         Returns list of (budget, action) tuples for budgets that would be exceeded.
@@ -204,8 +204,8 @@ class BudgetTracker:
         return exceeded
 
     def record_cost(
-        self, cost: float, tags: Optional[Dict[str, str]] = None
-    ) -> List[tuple[Budget, BudgetAction, float]]:
+        self, cost: float, tags: Optional[dict[str, str]] = None
+    ) -> list[tuple[Budget, BudgetAction, float]]:
         """
         Record a cost against matching budgets.
         Returns list of (budget, action, current_spending) for warnings/exceeded.
@@ -246,7 +246,7 @@ class BudgetTracker:
         return actions
 
     def reserve(
-        self, estimated_cost: float, tags: Optional[Dict[str, str]] = None
+        self, estimated_cost: float, tags: Optional[dict[str, str]] = None
     ) -> Optional[str]:
         """
         Reserve budget for a call (pessimistic mode).
@@ -271,7 +271,7 @@ class BudgetTracker:
         reservation_id: str,
         actual_cost: float,
         estimated_cost: float,
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
     ) -> None:
         """
         Finalize a reservation with the actual cost.
@@ -287,7 +287,7 @@ class BudgetTracker:
                 self._spending[budget.name] = self._spending.get(budget.name, 0.0) + adjustment
 
     def release(
-        self, reservation_id: str, estimated_cost: float, tags: Optional[Dict[str, str]] = None
+        self, reservation_id: str, estimated_cost: float, tags: Optional[dict[str, str]] = None
     ) -> None:
         """
         Release a reservation (on failure).

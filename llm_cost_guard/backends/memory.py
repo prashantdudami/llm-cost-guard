@@ -2,10 +2,10 @@
 In-memory storage backend for LLM Cost Guard.
 """
 
+import threading
 from collections import defaultdict
 from datetime import datetime
-from typing import Any, Dict, List, Optional
-import threading
+from typing import Any, Optional
 
 from llm_cost_guard.backends.base import Backend
 from llm_cost_guard.models import CostRecord, CostReport
@@ -21,7 +21,7 @@ class MemoryBackend(Backend):
         Args:
             max_records: Maximum number of records to keep in memory
         """
-        self._records: List[CostRecord] = []
+        self._records: list[CostRecord] = []
         self._max_records = max_records
         self._lock = threading.RLock()
 
@@ -35,7 +35,7 @@ class MemoryBackend(Backend):
                 evict_count = self._max_records // 10
                 self._records = self._records[evict_count:]
 
-    def save_records(self, records: List[CostRecord]) -> None:
+    def save_records(self, records: list[CostRecord]) -> None:
         """Save multiple cost records."""
         with self._lock:
             self._records.extend(records)
@@ -49,7 +49,7 @@ class MemoryBackend(Backend):
         record: CostRecord,
         start_date: Optional[datetime],
         end_date: Optional[datetime],
-        tags: Optional[Dict[str, str]],
+        tags: Optional[dict[str, str]],
     ) -> bool:
         """Check if a record matches the given filters."""
         if start_date and record.timestamp < start_date:
@@ -66,10 +66,10 @@ class MemoryBackend(Backend):
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
         limit: Optional[int] = None,
         offset: int = 0,
-    ) -> List[CostRecord]:
+    ) -> list[CostRecord]:
         """Retrieve cost records with optional filters."""
         with self._lock:
             filtered = [
@@ -91,7 +91,7 @@ class MemoryBackend(Backend):
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
     ) -> float:
         """Get total cost for the given filters."""
         with self._lock:
@@ -105,9 +105,9 @@ class MemoryBackend(Backend):
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        tags: Optional[Dict[str, str]] = None,
-        group_by: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        tags: Optional[dict[str, str]] = None,
+        group_by: Optional[list[str]] = None,
+    ) -> dict[str, Any]:
         """Get aggregated costs grouped by specified fields."""
         with self._lock:
             if not group_by:
@@ -132,7 +132,7 @@ class MemoryBackend(Backend):
                 }
 
             # Group by specified fields
-            groups: Dict[tuple, Dict[str, Any]] = defaultdict(
+            groups: dict[tuple, dict[str, Any]] = defaultdict(
                 lambda: {
                     "cost": 0.0,
                     "calls": 0,
@@ -179,8 +179,8 @@ class MemoryBackend(Backend):
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        tags: Optional[Dict[str, str]] = None,
-        group_by: Optional[List[str]] = None,
+        tags: Optional[dict[str, str]] = None,
+        group_by: Optional[list[str]] = None,
     ) -> CostReport:
         """Generate a cost report."""
         with self._lock:
@@ -233,7 +233,7 @@ class MemoryBackend(Backend):
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
     ) -> int:
         """Delete records matching the filters."""
         with self._lock:

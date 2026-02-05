@@ -4,8 +4,8 @@ Redis backend for LLM Cost Guard with distributed budget enforcement.
 
 import json
 import logging
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime
+from typing import Any, Optional
 
 from llm_cost_guard.backends.base import Backend
 from llm_cost_guard.models import CostRecord, CostReport, ModelType
@@ -108,13 +108,13 @@ return redis.call('GET', budget_key)
 class RedisBackend(Backend):
     """
     Redis backend with distributed budget enforcement.
-    
+
     Features:
     - Atomic budget checks using Lua scripts
     - Pessimistic reservation for distributed consistency
     - Automatic period reset via TTL
     - Cost record storage with configurable retention
-    
+
     Security:
     - Input validation on all key components
     - Safe key construction to prevent injection
@@ -135,19 +135,19 @@ class RedisBackend(Backend):
     def _validate_identifier(cls, value: str, name: str = "identifier") -> None:
         """
         Validate that a value is safe for use in Redis keys.
-        
+
         Security: Prevents key injection attacks.
-        
+
         Args:
             value: The value to validate
             name: Name of the parameter (for error messages)
-            
+
         Raises:
             ValueError: If the value is not safe
         """
         if not value or len(value) > 256:
             raise ValueError(f"Invalid {name}: must be 1-256 characters")
-        
+
         if not cls._get_identifier_pattern().match(value):
             raise ValueError(
                 f"Invalid {name}: only alphanumeric, underscore, and hyphen allowed"
@@ -164,7 +164,7 @@ class RedisBackend(Backend):
     ):
         """
         Initialize Redis backend.
-        
+
         Args:
             url: Redis connection URL (redis:// or rediss:// for TLS)
             prefix: Key prefix for all Redis keys
@@ -172,11 +172,11 @@ class RedisBackend(Backend):
             ssl_cert_reqs: SSL certificate requirements ('required', 'optional', 'none')
             ssl_ca_certs: Path to CA certificates file
             **kwargs: Additional Redis connection options
-            
+
         TLS Support:
             Use rediss:// URL scheme for TLS connections:
             - rediss://localhost:6379/0
-            
+
             Or configure SSL options:
             - ssl_cert_reqs="required"
             - ssl_ca_certs="/path/to/ca.pem"
@@ -191,10 +191,10 @@ class RedisBackend(Backend):
 
         self._prefix = prefix
         self._retention_days = retention_days
-        
+
         # Handle TLS configuration
         connection_kwargs = dict(kwargs)
-        
+
         # If using rediss:// URL, TLS is automatic
         # For additional SSL config, add to kwargs
         if ssl_cert_reqs:
@@ -207,18 +207,18 @@ class RedisBackend(Backend):
             connection_kwargs["ssl_cert_reqs"] = cert_reqs_map.get(
                 ssl_cert_reqs.lower(), ssl.CERT_REQUIRED
             )
-        
+
         if ssl_ca_certs:
             connection_kwargs["ssl_ca_certs"] = ssl_ca_certs
-        
+
         # Parse URL and connect
         self._client = redis.from_url(url, decode_responses=True, **connection_kwargs)
-        
+
         # Register Lua scripts
         self._budget_check_script = self._client.register_script(BUDGET_CHECK_SCRIPT)
         self._budget_reserve_script = self._client.register_script(BUDGET_RESERVE_SCRIPT)
         self._budget_finalize_script = self._client.register_script(BUDGET_FINALIZE_SCRIPT)
-        
+
         # Metrics for graceful degradation
         self._metrics = {
             "backend_failures": 0,
@@ -241,36 +241,36 @@ class RedisBackend(Backend):
         limit: float,
         period_seconds: int,
         warning_threshold: float = 0.8,
-    ) -> Tuple[bool, float, bool]:
+    ) -> tuple[bool, float, bool]:
         """
         Atomically check and record spending against a budget.
-        
+
         Args:
             budget_name: Name of the budget
             amount: Amount to add
             limit: Budget limit
             period_seconds: Period duration in seconds
             warning_threshold: Threshold for warning (0-1)
-            
+
         Returns:
             Tuple of (allowed, current_spending, is_warning)
         """
         budget_key = self._key("budget", budget_name)
         period_key = self._key("budget_period", budget_name)
-        
+
         try:
             result = self._budget_check_script(
                 keys=[budget_key, period_key],
                 args=[amount, limit, period_seconds, warning_threshold],
             )
-            
+
             new_total, current, warning = result
-            
+
             if new_total == -1:
                 return False, current, False  # Exceeded
-            
+
             return True, new_total, warning == 1
-            
+
         except Exception as e:
             logger.error(f"Redis budget check failed: {e}")
             self._metrics["backend_failures"] += 1
@@ -283,40 +283,40 @@ class RedisBackend(Backend):
         limit: float,
         reservation_id: str,
         period_seconds: int,
-    ) -> Tuple[bool, float]:
+    ) -> tuple[bool, float]:
         """
         Reserve budget before making an LLM call (pessimistic locking).
-        
+
         Args:
             budget_name: Name of the budget
             estimated_amount: Estimated cost to reserve
             limit: Budget limit
             reservation_id: Unique ID for this reservation
             period_seconds: Period duration in seconds
-            
+
         Returns:
             Tuple of (allowed, effective_spending)
         """
         # Security: Validate inputs to prevent key injection
         self._validate_identifier(budget_name, "budget_name")
         self._validate_identifier(reservation_id, "reservation_id")
-        
+
         budget_key = self._key("budget", budget_name)
         reservation_key = self._key("budget_reserved", budget_name)
-        
+
         try:
             result = self._budget_reserve_script(
                 keys=[budget_key, reservation_key],
                 args=[estimated_amount, limit, reservation_id, period_seconds],
             )
-            
+
             new_effective, current, _ = result
-            
+
             if new_effective == -1:
                 return False, current  # Would exceed
-            
+
             return True, new_effective
-            
+
         except Exception as e:
             logger.error(f"Redis budget reservation failed: {e}")
             self._metrics["backend_failures"] += 1
@@ -332,31 +332,31 @@ class RedisBackend(Backend):
     ) -> float:
         """
         Finalize a budget reservation with actual cost.
-        
+
         Args:
             budget_name: Name of the budget
             reserved_amount: Originally reserved amount
             actual_amount: Actual cost incurred
             reservation_id: Reservation ID
             period_seconds: Period duration in seconds
-            
+
         Returns:
             New total spending
         """
         # Security: Validate inputs to prevent key injection
         self._validate_identifier(budget_name, "budget_name")
         self._validate_identifier(reservation_id, "reservation_id")
-        
+
         budget_key = self._key("budget", budget_name)
         reservation_key = self._key("budget_reserved", budget_name)
-        
+
         try:
             result = self._budget_finalize_script(
                 keys=[budget_key, reservation_key],
                 args=[reserved_amount, actual_amount, reservation_id, period_seconds],
             )
             return float(result)
-            
+
         except Exception as e:
             logger.error(f"Redis budget finalization failed: {e}")
             self._metrics["backend_failures"] += 1
@@ -370,7 +370,7 @@ class RedisBackend(Backend):
     ) -> None:
         """
         Release a reservation (on failure or cancellation).
-        
+
         Args:
             budget_name: Name of the budget
             reserved_amount: Amount that was reserved
@@ -379,9 +379,9 @@ class RedisBackend(Backend):
         # Security: Validate inputs to prevent key injection
         self._validate_identifier(budget_name, "budget_name")
         self._validate_identifier(reservation_id, "reservation_id")
-        
+
         reservation_key = self._key("budget_reserved", budget_name)
-        
+
         try:
             pipe = self._client.pipeline()
             pipe.incrbyfloat(reservation_key, -reserved_amount)
@@ -420,30 +420,30 @@ class RedisBackend(Backend):
         """Save a cost record."""
         record_key = self._key("record", record.timestamp.strftime("%Y%m%d%H%M%S%f"))
         record_data = self._serialize_record(record)
-        
+
         try:
             pipe = self._client.pipeline()
-            
+
             # Save record with TTL
             ttl_seconds = self._retention_days * 24 * 60 * 60
             pipe.setex(record_key, ttl_seconds, json.dumps(record_data))
-            
+
             # Add to sorted set for range queries (score = timestamp)
             records_key = self._key("records")
             score = record.timestamp.timestamp()
             pipe.zadd(records_key, {record_key: score})
-            
+
             # Update aggregates for quick reporting
             self._update_aggregates(pipe, record)
-            
+
             pipe.execute()
-            
+
         except Exception as e:
             logger.error(f"Redis save record failed: {e}")
             self._metrics["backend_failures"] += 1
             raise
 
-    def save_records(self, records: List[CostRecord]) -> None:
+    def save_records(self, records: list[CostRecord]) -> None:
         """Save multiple cost records."""
         for record in records:
             self.save_record(record)
@@ -451,8 +451,8 @@ class RedisBackend(Backend):
     def _update_aggregates(self, pipe: Any, record: CostRecord) -> None:
         """Update aggregate counters for quick reporting."""
         date_str = record.timestamp.strftime("%Y-%m-%d")
-        hour_str = record.timestamp.strftime("%Y-%m-%d-%H")
-        
+        record.timestamp.strftime("%Y-%m-%d-%H")
+
         # Daily aggregates
         daily_key = self._key("agg", "daily", date_str)
         pipe.hincrbyfloat(daily_key, "total_cost", record.total_cost)
@@ -460,13 +460,13 @@ class RedisBackend(Backend):
         pipe.hincrby(daily_key, "input_tokens", record.input_tokens)
         pipe.hincrby(daily_key, "output_tokens", record.output_tokens)
         pipe.expire(daily_key, self._retention_days * 24 * 60 * 60)
-        
+
         # Model aggregates
         model_key = self._key("agg", "model", date_str, record.model)
         pipe.hincrbyfloat(model_key, "total_cost", record.total_cost)
         pipe.hincrby(model_key, "total_calls", 1)
         pipe.expire(model_key, self._retention_days * 24 * 60 * 60)
-        
+
         # Tag aggregates
         for tag_key, tag_value in record.tags.items():
             tag_agg_key = self._key("agg", "tag", date_str, tag_key, tag_value)
@@ -478,45 +478,45 @@ class RedisBackend(Backend):
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
         limit: int = 1000,
-    ) -> List[CostRecord]:
+    ) -> list[CostRecord]:
         """Get cost records with optional filtering."""
         records_key = self._key("records")
-        
+
         try:
             # Get record keys from sorted set
             min_score = start_date.timestamp() if start_date else "-inf"
             max_score = end_date.timestamp() if end_date else "+inf"
-            
+
             record_keys = self._client.zrangebyscore(
                 records_key, min_score, max_score, start=0, num=limit
             )
-            
+
             if not record_keys:
                 return []
-            
+
             # Fetch records
             pipe = self._client.pipeline()
             for key in record_keys:
                 pipe.get(key)
-            
+
             results = pipe.execute()
-            
+
             records = []
             for data in results:
                 if data:
                     record = self._deserialize_record(json.loads(data))
-                    
+
                     # Filter by tags if specified
                     if tags:
                         if all(record.tags.get(k) == v for k, v in tags.items()):
                             records.append(record)
                     else:
                         records.append(record)
-            
+
             return records
-            
+
         except Exception as e:
             logger.error(f"Redis get records failed: {e}")
             self._metrics["backend_failures"] += 1
@@ -526,15 +526,15 @@ class RedisBackend(Backend):
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        tags: Optional[Dict[str, str]] = None,
-        group_by: Optional[List[str]] = None,
+        tags: Optional[dict[str, str]] = None,
+        group_by: Optional[list[str]] = None,
     ) -> CostReport:
         """Get aggregated cost report."""
         records = self.get_records(start_date, end_date, tags)
-        
+
         total_cost = sum(r.total_cost for r in records)
         total_tokens = sum(r.input_tokens + r.output_tokens for r in records)
-        
+
         return CostReport(
             total_cost=total_cost,
             total_tokens=total_tokens,
@@ -546,11 +546,11 @@ class RedisBackend(Backend):
         )
 
     def _group_records(
-        self, records: List[CostRecord], group_by: List[str]
-    ) -> Dict[str, Any]:
+        self, records: list[CostRecord], group_by: list[str]
+    ) -> dict[str, Any]:
         """Group records by specified fields."""
-        groups: Dict[str, Dict[str, float]] = {}
-        
+        groups: dict[str, dict[str, float]] = {}
+
         for record in records:
             key_parts = []
             for field in group_by:
@@ -563,23 +563,23 @@ class RedisBackend(Backend):
                     key_parts.append(record.tags.get(tag_name, "unknown"))
                 else:
                     key_parts.append(record.tags.get(field, "unknown"))
-            
+
             key = "|".join(key_parts)
-            
+
             if key not in groups:
                 groups[key] = {"cost": 0.0, "calls": 0, "tokens": 0}
-            
+
             groups[key]["cost"] += record.total_cost
             groups[key]["calls"] += 1
             groups[key]["tokens"] += record.input_tokens + record.output_tokens
-        
+
         return groups
 
     def get_total_cost(
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
     ) -> float:
         """Get total cost for the given filters."""
         records = self.get_records(start_date, end_date, tags)
@@ -589,19 +589,19 @@ class RedisBackend(Backend):
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        tags: Optional[Dict[str, str]] = None,
-        group_by: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        tags: Optional[dict[str, str]] = None,
+        group_by: Optional[list[str]] = None,
+    ) -> dict[str, Any]:
         """Get aggregated costs grouped by specified fields."""
         records = self.get_records(start_date, end_date, tags)
-        
+
         if not group_by:
             return {
                 "total_cost": sum(r.total_cost for r in records),
                 "total_calls": len(records),
                 "total_tokens": sum(r.input_tokens + r.output_tokens for r in records),
             }
-        
+
         groups = self._group_records(records, group_by)
         return {"groups": [{"key": k, **v} for k, v in groups.items()]}
 
@@ -609,21 +609,21 @@ class RedisBackend(Backend):
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
     ) -> int:
         """Delete records matching the filters."""
         records_key = self._key("records")
-        
+
         try:
             # Get record keys to delete
             min_score = start_date.timestamp() if start_date else "-inf"
             max_score = end_date.timestamp() if end_date else "+inf"
-            
+
             record_keys = self._client.zrangebyscore(records_key, min_score, max_score)
-            
+
             if not record_keys:
                 return 0
-            
+
             # If tags filter, we need to check each record
             if tags:
                 keys_to_delete = []
@@ -631,32 +631,32 @@ class RedisBackend(Backend):
                 for key in record_keys:
                     pipe.get(key)
                 results = pipe.execute()
-                
+
                 for key, data in zip(record_keys, results):
                     if data:
                         record = self._deserialize_record(json.loads(data))
                         if all(record.tags.get(k) == v for k, v in tags.items()):
                             keys_to_delete.append(key)
                 record_keys = keys_to_delete
-            
+
             if not record_keys:
                 return 0
-            
+
             # Delete records and remove from sorted set
             pipe = self._client.pipeline()
             for key in record_keys:
                 pipe.delete(key)
                 pipe.zrem(records_key, key)
             pipe.execute()
-            
+
             return len(record_keys)
-            
+
         except Exception as e:
             logger.error(f"Redis delete records failed: {e}")
             self._metrics["backend_failures"] += 1
             return 0
 
-    def _serialize_record(self, record: CostRecord) -> Dict[str, Any]:
+    def _serialize_record(self, record: CostRecord) -> dict[str, Any]:
         """Serialize a CostRecord to dict."""
         return {
             "timestamp": record.timestamp.isoformat(),
@@ -678,7 +678,7 @@ class RedisBackend(Backend):
             "span_id": record.span_id,
         }
 
-    def _deserialize_record(self, data: Dict[str, Any]) -> CostRecord:
+    def _deserialize_record(self, data: dict[str, Any]) -> CostRecord:
         """Deserialize a dict to CostRecord."""
         return CostRecord(
             timestamp=datetime.fromisoformat(data["timestamp"]),
@@ -712,7 +712,7 @@ class RedisBackend(Backend):
         except Exception:
             return False
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get backend metrics for observability."""
         return {
             **self._metrics,

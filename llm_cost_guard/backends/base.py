@@ -4,7 +4,7 @@ Base backend interface for LLM Cost Guard.
 
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from llm_cost_guard.models import CostRecord, CostReport
 
@@ -18,7 +18,7 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def save_records(self, records: List[CostRecord]) -> None:
+    def save_records(self, records: list[CostRecord]) -> None:
         """Save multiple cost records."""
         pass
 
@@ -27,10 +27,10 @@ class Backend(ABC):
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
         limit: Optional[int] = None,
         offset: int = 0,
-    ) -> List[CostRecord]:
+    ) -> list[CostRecord]:
         """
         Retrieve cost records with optional filters.
 
@@ -51,7 +51,7 @@ class Backend(ABC):
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
     ) -> float:
         """Get total cost for the given filters."""
         pass
@@ -61,9 +61,9 @@ class Backend(ABC):
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        tags: Optional[Dict[str, str]] = None,
-        group_by: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        tags: Optional[dict[str, str]] = None,
+        group_by: Optional[list[str]] = None,
+    ) -> dict[str, Any]:
         """
         Get aggregated costs grouped by specified fields.
 
@@ -83,8 +83,8 @@ class Backend(ABC):
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        tags: Optional[Dict[str, str]] = None,
-        group_by: Optional[List[str]] = None,
+        tags: Optional[dict[str, str]] = None,
+        group_by: Optional[list[str]] = None,
     ) -> CostReport:
         """Generate a cost report."""
         pass
@@ -94,7 +94,7 @@ class Backend(ABC):
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
     ) -> int:
         """
         Delete records matching the filters.

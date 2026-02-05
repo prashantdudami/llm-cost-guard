@@ -4,7 +4,7 @@ Cache integration for LLM Cost Guard.
 
 import functools
 import logging
-from typing import Any, Callable, Dict, Optional, TypeVar
+from typing import Any, Callable, Optional, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ class CacheTracker:
     def __init__(
         self,
         tracker: Any,  # CostTracker
-        default_tags: Optional[Dict[str, str]] = None,
+        default_tags: Optional[dict[str, str]] = None,
     ):
         """
         Initialize the cache tracker.
@@ -50,7 +50,7 @@ class CacheTracker:
         self,
         func: Optional[F] = None,
         *,
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
         cache_indicator: str = "_from_cache",
     ) -> F:
         """
@@ -104,7 +104,7 @@ class CacheTracker:
         estimated_cost: float,
         provider: str = "unknown",
         model: str = "unknown",
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
     ) -> None:
         """
         Manually record a cache hit with estimated savings.
@@ -138,7 +138,7 @@ class CacheTracker:
         self,
         provider: str = "unknown",
         model: str = "unknown",
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
     ) -> None:
         """
         Manually record a cache miss.
@@ -179,7 +179,7 @@ class CacheTracker:
         self._cache_misses = 0
         self._estimated_savings = 0.0
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics."""
         return {
             "cache_hits": self._cache_hits,

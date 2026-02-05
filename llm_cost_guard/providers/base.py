@@ -3,7 +3,7 @@ Base provider interface for LLM Cost Guard.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any
 
 from llm_cost_guard.models import UsageData
 

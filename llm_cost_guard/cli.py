@@ -6,7 +6,6 @@ import argparse
 import json
 import sys
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional
 
 from llm_cost_guard import CostTracker
 from llm_cost_guard.pricing.loader import PricingLoader
@@ -63,10 +62,10 @@ def create_parser() -> argparse.ArgumentParser:
     )
 
     # pricing-status command
-    pricing_parser = subparsers.add_parser("pricing-status", help="Check pricing data status")
+    subparsers.add_parser("pricing-status", help="Check pricing data status")
 
     # update-pricing command
-    update_parser = subparsers.add_parser("update-pricing", help="Update pricing data")
+    subparsers.add_parser("update-pricing", help="Update pricing data")
 
     # export command
     export_parser = subparsers.add_parser("export", help="Export cost data")
@@ -372,7 +371,7 @@ def cmd_validate_config(args: argparse.Namespace) -> int:
     try:
         import yaml
 
-        with open(args.config, "r") as f:
+        with open(args.config) as f:
             config = yaml.safe_load(f)
 
         print(f"Configuration file: {args.config}")

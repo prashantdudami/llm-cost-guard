@@ -7,7 +7,7 @@ Supports any secrets backend - environment variables, Vault, or cloud providers.
 import logging
 import os
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class SecretsProvider(ABC):
     """
     Abstract secrets provider.
-    
+
     Implement this interface for any secrets backend:
     - Local: Environment variables (default)
     - HashiCorp: Vault
@@ -28,10 +28,10 @@ class SecretsProvider(ABC):
     def get_secret(self, key: str) -> Optional[str]:
         """
         Retrieve a secret value.
-        
+
         Args:
             key: Secret key/name
-            
+
         Returns:
             Secret value or None if not found
         """
@@ -40,13 +40,13 @@ class SecretsProvider(ABC):
     def get_secret_required(self, key: str) -> str:
         """
         Retrieve a secret value, raising if not found.
-        
+
         Args:
             key: Secret key/name
-            
+
         Returns:
             Secret value
-            
+
         Raises:
             ValueError: If secret is not found
         """
@@ -55,13 +55,13 @@ class SecretsProvider(ABC):
             raise ValueError(f"Required secret not found: {key}")
         return value
 
-    def get_json_secret(self, key: str) -> Optional[Dict[str, Any]]:
+    def get_json_secret(self, key: str) -> Optional[dict[str, Any]]:
         """
         Retrieve and parse a JSON secret.
-        
+
         Args:
             key: Secret key/name
-            
+
         Returns:
             Parsed JSON as dict, or None if not found
         """
@@ -75,9 +75,9 @@ class SecretsProvider(ABC):
 class EnvironmentSecretsProvider(SecretsProvider):
     """
     Read secrets from environment variables.
-    
+
     This is the default provider - works everywhere without dependencies.
-    
+
     Usage:
         provider = EnvironmentSecretsProvider(prefix="LLM_COST_GUARD_")
         redis_url = provider.get_secret("REDIS_URL")
@@ -87,7 +87,7 @@ class EnvironmentSecretsProvider(SecretsProvider):
     def __init__(self, prefix: str = ""):
         """
         Initialize with optional prefix.
-        
+
         Args:
             prefix: Prefix to add to all secret keys
         """
@@ -102,12 +102,12 @@ class EnvironmentSecretsProvider(SecretsProvider):
 class FileSecretsProvider(SecretsProvider):
     """
     Read secrets from files (useful for Kubernetes secrets mounted as volumes).
-    
+
     Usage:
         provider = FileSecretsProvider(base_path="/var/secrets")
         redis_url = provider.get_secret("redis-url")
         # Reads from /var/secrets/redis-url
-    
+
     Security:
         - Path traversal protection: Keys containing '..' or absolute paths are rejected
         - Only files within base_path can be read
@@ -116,7 +116,7 @@ class FileSecretsProvider(SecretsProvider):
     def __init__(self, base_path: str):
         """
         Initialize with base path.
-        
+
         Args:
             base_path: Directory containing secret files
         """
@@ -125,31 +125,31 @@ class FileSecretsProvider(SecretsProvider):
     def get_secret(self, key: str) -> Optional[str]:
         """
         Read secret from file.
-        
+
         Security: Validates key to prevent path traversal attacks.
         """
         # Security: Validate key to prevent path traversal
         if not self._is_safe_key(key):
             logger.warning(f"Rejected unsafe secret key: {key}")
             return None
-        
+
         file_path = os.path.join(self._base_path, key)
-        
+
         # Security: Double-check resolved path is within base_path
         resolved_path = os.path.abspath(file_path)
         if not resolved_path.startswith(self._base_path + os.sep) and resolved_path != self._base_path:
             logger.warning(f"Path traversal attempt detected: {key}")
             return None
-        
+
         try:
-            with open(resolved_path, "r") as f:
+            with open(resolved_path) as f:
                 return f.read().strip()
         except FileNotFoundError:
             return None
         except PermissionError:
             logger.warning(f"Permission denied reading secret: {key}")
             return None
-        except IOError as e:
+        except OSError as e:
             logger.warning(f"Error reading secret {key}: {e}")
             return None
 
@@ -159,32 +159,32 @@ class FileSecretsProvider(SecretsProvider):
         # Reject empty keys
         if not key or not key.strip():
             return False
-        
+
         # Reject absolute paths
         if os.path.isabs(key):
             return False
-        
+
         # Reject path traversal sequences
         if ".." in key:
             return False
-        
+
         # Reject keys with path separators (be strict)
         if os.sep in key or "/" in key or "\\" in key:
             return False
-        
+
         # Reject null bytes
         if "\x00" in key:
             return False
-        
+
         return True
 
 
 class VaultSecretsProvider(SecretsProvider):
     """
     HashiCorp Vault secrets provider.
-    
+
     Cloud-agnostic - works on any infrastructure.
-    
+
     Usage:
         provider = VaultSecretsProvider(
             url="https://vault.example.com",
@@ -203,7 +203,7 @@ class VaultSecretsProvider(SecretsProvider):
     ):
         """
         Initialize Vault client.
-        
+
         Args:
             url: Vault URL (or VAULT_ADDR env var)
             token: Vault token (or VAULT_TOKEN env var)
@@ -231,11 +231,11 @@ class VaultSecretsProvider(SecretsProvider):
             token=self._token,
             namespace=self._namespace,
         )
-        
-        # Cache secrets to reduce API calls
-        self._cache: Optional[Dict[str, Any]] = None
 
-    def _load_secrets(self) -> Dict[str, Any]:
+        # Cache secrets to reduce API calls
+        self._cache: Optional[dict[str, Any]] = None
+
+    def _load_secrets(self) -> dict[str, Any]:
         """Load all secrets from Vault path."""
         if self._cache is None:
             try:
@@ -262,9 +262,9 @@ class VaultSecretsProvider(SecretsProvider):
 class CompositeSecretsProvider(SecretsProvider):
     """
     Chain multiple secrets providers with fallback.
-    
+
     Tries each provider in order until a secret is found.
-    
+
     Usage:
         provider = CompositeSecretsProvider([
             VaultSecretsProvider(...),  # Try Vault first
@@ -275,7 +275,7 @@ class CompositeSecretsProvider(SecretsProvider):
     def __init__(self, providers: list):
         """
         Initialize with list of providers.
-        
+
         Args:
             providers: List of SecretsProvider instances (tried in order)
         """
@@ -299,11 +299,11 @@ def get_secrets_provider(
 ) -> SecretsProvider:
     """
     Factory function to create secrets providers.
-    
+
     Args:
         provider_type: One of "env", "file", "vault", "aws", "gcp", "azure"
         **kwargs: Provider-specific configuration
-        
+
     Returns:
         SecretsProvider instance
     """
@@ -311,16 +311,16 @@ def get_secrets_provider(
         return EnvironmentSecretsProvider(
             prefix=kwargs.get("prefix", "")
         )
-    
+
     if provider_type == "file":
         base_path = kwargs.get("base_path")
         if not base_path:
             raise ValueError("FileSecretsProvider requires 'base_path' parameter")
         return FileSecretsProvider(base_path=base_path)
-    
+
     if provider_type == "vault":
         return VaultSecretsProvider(**kwargs)
-    
+
     if provider_type == "aws":
         try:
             from llm_cost_guard.secrets_aws import AWSSecretsProvider
@@ -330,7 +330,7 @@ def get_secrets_provider(
                 "AWS Secrets Manager requires boto3. "
                 "Install with: pip install llm-cost-guard[aws]"
             )
-    
+
     if provider_type == "gcp":
         try:
             from llm_cost_guard.secrets_gcp import GCPSecretsProvider
@@ -340,7 +340,7 @@ def get_secrets_provider(
                 "GCP Secret Manager requires google-cloud-secret-manager. "
                 "Install with: pip install llm-cost-guard[gcp]"
             )
-    
+
     if provider_type == "azure":
         try:
             from llm_cost_guard.secrets_azure import AzureSecretsProvider
@@ -350,5 +350,5 @@ def get_secrets_provider(
                 "Azure Key Vault requires azure-keyvault-secrets. "
                 "Install with: pip install llm-cost-guard[azure]"
             )
-    
+
     raise ValueError(f"Unknown secrets provider: {provider_type}")

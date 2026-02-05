@@ -4,7 +4,7 @@ LangChain integration for LLM Cost Guard.
 
 import functools
 import logging
-from typing import Any, Callable, Dict, List, Optional, TypeVar, Union
+from typing import Any, Callable, Optional, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ class CostTrackingCallback(BaseCallbackHandler):
     def __init__(
         self,
         tracker: Any,  # CostTracker
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
     ):
         """
         Initialize the callback handler.
@@ -60,17 +60,17 @@ class CostTrackingCallback(BaseCallbackHandler):
         self._default_tags = tags or {}
 
         # Track in-flight calls
-        self._run_info: Dict[str, Dict[str, Any]] = {}
+        self._run_info: dict[str, dict[str, Any]] = {}
 
     def on_llm_start(
         self,
-        serialized: Dict[str, Any],
-        prompts: List[str],
+        serialized: dict[str, Any],
+        prompts: list[str],
         *,
         run_id: Any,
         parent_run_id: Optional[Any] = None,
-        tags: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        tags: Optional[list[str]] = None,
+        metadata: Optional[dict[str, Any]] = None,
         **kwargs: Any,
     ) -> None:
         """Record the start of an LLM call."""
@@ -86,13 +86,13 @@ class CostTrackingCallback(BaseCallbackHandler):
 
     def on_chat_model_start(
         self,
-        serialized: Dict[str, Any],
-        messages: List[List[Any]],
+        serialized: dict[str, Any],
+        messages: list[list[Any]],
         *,
         run_id: Any,
         parent_run_id: Optional[Any] = None,
-        tags: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        tags: Optional[list[str]] = None,
+        metadata: Optional[dict[str, Any]] = None,
         **kwargs: Any,
     ) -> None:
         """Record the start of a chat model call."""
@@ -227,7 +227,7 @@ class CostTrackingCallback(BaseCallbackHandler):
 
 def track_chain(
     tracker: Any,  # CostTracker
-    tags: Optional[Dict[str, str]] = None,
+    tags: Optional[dict[str, str]] = None,
 ) -> Callable[[F], F]:
     """
     Decorator to track costs for an entire LangChain chain.

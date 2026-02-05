@@ -5,7 +5,7 @@ Data models for LLM Cost Guard.
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Optional
 
 
 class ModelType(str, Enum):
@@ -32,8 +32,8 @@ class CostRecord:
     output_cost: float = 0.0
     total_cost: float = 0.0
     latency_ms: int = 0
-    tags: Dict[str, str] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    tags: dict[str, str] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     success: bool = True
     error_type: Optional[str] = None
     cached: bool = False
@@ -61,8 +61,8 @@ class CostReport:
     cache_hits: int = 0
     cache_savings: float = 0.0
     effective_cost: float = 0.0  # total_cost - cache_savings
-    records: List[CostRecord] = field(default_factory=list)
-    grouped_data: Dict[str, Any] = field(default_factory=dict)
+    records: list[CostRecord] = field(default_factory=list)
+    grouped_data: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Calculate effective cost."""
@@ -79,7 +79,7 @@ class HealthStatus:
     pricing_fresh: bool = True
     last_record_time: Optional[datetime] = None
     pending_records: int = 0
-    errors: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
     pricing_version: Optional[str] = None
     pricing_last_updated: Optional[datetime] = None
 

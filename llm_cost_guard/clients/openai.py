@@ -3,7 +3,7 @@ Wrapped OpenAI client with automatic cost tracking.
 """
 
 import time
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from llm_cost_guard import CostTracker
@@ -31,7 +31,7 @@ class TrackedOpenAI:
         self,
         tracker: "CostTracker",
         client: Optional[Any] = None,
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
         **openai_kwargs: Any,
     ):
         """
@@ -82,7 +82,7 @@ class TrackedOpenAI:
 class _TrackedChat:
     """Wrapped chat completions API."""
 
-    def __init__(self, chat, tracker: "CostTracker", default_tags: Dict[str, str]):
+    def __init__(self, chat, tracker: "CostTracker", default_tags: dict[str, str]):
         self._chat = chat
         self._tracker = tracker
         self._default_tags = default_tags
@@ -94,7 +94,7 @@ class _TrackedChat:
 class _TrackedChatCompletions:
     """Wrapped chat.completions API."""
 
-    def __init__(self, completions, tracker: "CostTracker", default_tags: Dict[str, str]):
+    def __init__(self, completions, tracker: "CostTracker", default_tags: dict[str, str]):
         self._completions = completions
         self._tracker = tracker
         self._default_tags = default_tags
@@ -102,7 +102,7 @@ class _TrackedChatCompletions:
     def create(
         self,
         *,
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
         **kwargs: Any,
     ) -> Any:
         """Create a chat completion with tracking."""
@@ -127,7 +127,7 @@ class _TrackedChatCompletions:
     def _record_response(
         self,
         response: Any,
-        tags: Optional[Dict[str, str]],
+        tags: Optional[dict[str, str]],
         success: bool,
         error_type: Optional[str],
         latency_ms: int,
@@ -159,7 +159,7 @@ class _TrackedChatCompletions:
 class _TrackedCompletions:
     """Wrapped completions API (legacy)."""
 
-    def __init__(self, completions, tracker: "CostTracker", default_tags: Dict[str, str]):
+    def __init__(self, completions, tracker: "CostTracker", default_tags: dict[str, str]):
         self._completions = completions
         self._tracker = tracker
         self._default_tags = default_tags
@@ -167,7 +167,7 @@ class _TrackedCompletions:
     def create(
         self,
         *,
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
         **kwargs: Any,
     ) -> Any:
         """Create a completion with tracking."""
@@ -212,7 +212,7 @@ class _TrackedCompletions:
 class _TrackedEmbeddings:
     """Wrapped embeddings API."""
 
-    def __init__(self, embeddings, tracker: "CostTracker", default_tags: Dict[str, str]):
+    def __init__(self, embeddings, tracker: "CostTracker", default_tags: dict[str, str]):
         self._embeddings = embeddings
         self._tracker = tracker
         self._default_tags = default_tags
@@ -220,7 +220,7 @@ class _TrackedEmbeddings:
     def create(
         self,
         *,
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
         **kwargs: Any,
     ) -> Any:
         """Create embeddings with tracking."""

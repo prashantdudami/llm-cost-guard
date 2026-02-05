@@ -2,11 +2,10 @@
 Rate limiting for LLM Cost Guard.
 """
 
-from dataclasses import dataclass
-from datetime import datetime, timedelta
-from typing import Dict, List, Literal, Optional, Tuple
 import threading
 import time
+from dataclasses import dataclass
+from typing import Literal, Optional
 
 RateLimitPeriod = Literal["second", "minute", "hour"]
 RateLimitScope = Literal["global", "model", "provider"]
@@ -25,10 +24,10 @@ class RateLimit:
 class SlidingWindowCounter:
     """
     Sliding window rate limiter implementation.
-    
+
     Thread-safe with memory-bounded storage.
     """
-    
+
     # Maximum requests to store to prevent memory issues
     MAX_STORED_REQUESTS = 100000
 
@@ -37,22 +36,22 @@ class SlidingWindowCounter:
             raise ValueError("window_size_seconds must be > 0")
         if limit <= 0:
             raise ValueError("limit must be > 0")
-            
+
         self._window_size = window_size_seconds
         self._limit = limit
-        self._requests: List[float] = []
+        self._requests: list[float] = []
         self._lock = threading.Lock()
 
     def _cleanup(self, now: float) -> None:
         """Remove expired entries and enforce memory bound."""
         cutoff = now - self._window_size
         self._requests = [t for t in self._requests if t > cutoff]
-        
+
         # Memory safety: truncate if too many requests
         if len(self._requests) > self.MAX_STORED_REQUESTS:
             self._requests = self._requests[-self.MAX_STORED_REQUESTS:]
 
-    def check(self) -> Tuple[bool, int, Optional[float]]:
+    def check(self) -> tuple[bool, int, Optional[float]]:
         """
         Check if a request would be allowed.
         Returns (allowed, current_count, retry_after_seconds).
@@ -101,10 +100,10 @@ class SlidingWindowCounter:
 class RateLimiter:
     """Manages rate limiting across multiple limits and scopes."""
 
-    def __init__(self, rate_limits: Optional[List[RateLimit]] = None):
+    def __init__(self, rate_limits: Optional[list[RateLimit]] = None):
         self._rate_limits = rate_limits or []
         # Key: (limit_name, scope_value) -> SlidingWindowCounter
-        self._counters: Dict[Tuple[str, str], SlidingWindowCounter] = {}
+        self._counters: dict[tuple[str, str], SlidingWindowCounter] = {}
         self._lock = threading.Lock()
 
     def _get_period_seconds(self, period: RateLimitPeriod) -> float:
@@ -121,7 +120,7 @@ class RateLimiter:
         rate_limit: RateLimit,
         model: Optional[str] = None,
         provider: Optional[str] = None,
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
     ) -> str:
         """Get the scope key for a rate limit."""
         scope = rate_limit.scope
@@ -181,8 +180,8 @@ class RateLimiter:
         self,
         model: Optional[str] = None,
         provider: Optional[str] = None,
-        tags: Optional[Dict[str, str]] = None,
-    ) -> List[Tuple[RateLimit, int, Optional[float]]]:
+        tags: Optional[dict[str, str]] = None,
+    ) -> list[tuple[RateLimit, int, Optional[float]]]:
         """
         Check all rate limits.
         Returns list of (rate_limit, current_count, retry_after) for exceeded limits.
@@ -203,8 +202,8 @@ class RateLimiter:
         self,
         model: Optional[str] = None,
         provider: Optional[str] = None,
-        tags: Optional[Dict[str, str]] = None,
-    ) -> List[Tuple[RateLimit, int, Optional[float]]]:
+        tags: Optional[dict[str, str]] = None,
+    ) -> list[tuple[RateLimit, int, Optional[float]]]:
         """
         Record a request against all applicable rate limits.
         Returns list of (rate_limit, current_count, retry_after) for limits that are now exceeded.
@@ -226,7 +225,7 @@ class RateLimiter:
         name: str,
         model: Optional[str] = None,
         provider: Optional[str] = None,
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
     ) -> int:
         """Get remaining requests for a rate limit."""
         rate_limit = self.get_rate_limit(name)

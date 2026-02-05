@@ -2,15 +2,15 @@
 Pricing data loader for LLM Cost Guard.
 """
 
-import os
+import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
-import logging
+from typing import Any, Optional
+
 import yaml
 
-from llm_cost_guard.models import ModelPricing, ModelType
 from llm_cost_guard.exceptions import PricingNotFoundError
+from llm_cost_guard.models import ModelPricing, ModelType
 
 logger = logging.getLogger(__name__)
 
@@ -23,13 +23,13 @@ class PricingLoader:
 
     def __init__(
         self,
-        pricing_overrides: Optional[Dict[str, Dict[str, Any]]] = None,
+        pricing_overrides: Optional[dict[str, dict[str, Any]]] = None,
         pricing_stale_warning_days: int = 7,
         pricing_stale_error_days: int = 30,
         bedrock_region: str = "us-east-1",
     ):
-        self._pricing_data: Dict[str, Dict[str, ModelPricing]] = {}
-        self._pricing_versions: Dict[str, str] = {}
+        self._pricing_data: dict[str, dict[str, ModelPricing]] = {}
+        self._pricing_versions: dict[str, str] = {}
         self._pricing_overrides = pricing_overrides or {}
         self._stale_warning_days = pricing_stale_warning_days
         self._stale_error_days = pricing_stale_error_days
@@ -49,7 +49,7 @@ class PricingLoader:
     def _load_provider_pricing(self, provider: str, yaml_path: Path) -> None:
         """Load pricing for a specific provider."""
         try:
-            with open(yaml_path, "r") as f:
+            with open(yaml_path) as f:
                 data = yaml.safe_load(f)
 
             if not data:
@@ -126,17 +126,17 @@ class PricingLoader:
     ) -> tuple[float, float, float]:
         """
         Calculate cost for a call.
-        
+
         Args:
             provider: Provider name (e.g., "openai", "anthropic")
             model: Model name (e.g., "gpt-4o", "claude-3-sonnet")
             input_tokens: Number of input tokens (must be >= 0)
             output_tokens: Number of output tokens (must be >= 0)
             cached_tokens: Number of cached input tokens (must be >= 0)
-            
+
         Returns:
             Tuple of (input_cost, output_cost, total_cost)
-            
+
         Raises:
             ValueError: If any token count is negative
             PricingNotFoundError: If pricing not found for model
@@ -154,7 +154,7 @@ class PricingLoader:
                 "capping to input_tokens"
             )
             cached_tokens = input_tokens
-            
+
         pricing = self.get_pricing(provider, model)
 
         # Calculate input cost (considering cache)
@@ -193,7 +193,7 @@ class PricingLoader:
         return self._last_loaded
 
     @property
-    def pricing_version(self) -> Dict[str, str]:
+    def pricing_version(self) -> dict[str, str]:
         """Get pricing versions for all providers."""
         return dict(self._pricing_versions)
 
@@ -215,7 +215,7 @@ class PricingLoader:
         age_days = (datetime.now() - self._last_loaded).days
         return age_days >= self._stale_error_days
 
-    def get_all_models(self, provider: Optional[str] = None) -> Dict[str, list[str]]:
+    def get_all_models(self, provider: Optional[str] = None) -> dict[str, list[str]]:
         """Get all known models, optionally filtered by provider."""
         if provider:
             return {provider: list(self._pricing_data.get(provider, {}).keys())}

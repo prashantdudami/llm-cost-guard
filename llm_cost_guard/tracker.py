@@ -5,12 +5,13 @@ Main CostTracker class for LLM Cost Guard.
 import asyncio
 import functools
 import logging
-import time
 import threading
+import time
 from contextlib import contextmanager
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Literal, Optional, TypeVar, Union
+from typing import Any, Callable, Literal, Optional, TypeVar, Union
 
+from llm_cost_guard.audit import AuditBackend, AuditLogger, LoggingAuditBackend
 from llm_cost_guard.backends import Backend, MemoryBackend, get_backend
 from llm_cost_guard.budget import Budget, BudgetAction, BudgetTracker
 from llm_cost_guard.exceptions import (
@@ -18,12 +19,11 @@ from llm_cost_guard.exceptions import (
     RateLimitExceededError,
     TrackingUnavailableError,
 )
-from llm_cost_guard.models import CostRecord, CostReport, HealthStatus, ModelType, UsageData
-from llm_cost_guard.pricing.loader import PricingLoader, get_pricing_loader
+from llm_cost_guard.models import CostRecord, CostReport, HealthStatus, ModelType
+from llm_cost_guard.pricing.loader import PricingLoader
 from llm_cost_guard.providers import detect_provider, get_provider
 from llm_cost_guard.rate_limit import RateLimit, RateLimiter
 from llm_cost_guard.span import Span, get_current_span
-from llm_cost_guard.audit import AuditLogger, AuditBackend, LoggingAuditBackend
 
 logger = logging.getLogger(__name__)
 
@@ -39,12 +39,12 @@ class CostTracker:
 
     def __init__(
         self,
-        budgets: Optional[List[Budget]] = None,
-        rate_limits: Optional[List[RateLimit]] = None,
+        budgets: Optional[list[Budget]] = None,
+        rate_limits: Optional[list[RateLimit]] = None,
         backend: str = "memory",
         auto_detect_provider: bool = True,
         pricing_update: bool = True,
-        pricing_overrides: Optional[Dict[str, Dict[str, Any]]] = None,
+        pricing_overrides: Optional[dict[str, dict[str, Any]]] = None,
         on_tracking_failure: Literal["block", "allow", "fallback"] = "allow",
         store_prompts: bool = False,
         track_failed_calls: bool = True,
@@ -132,7 +132,7 @@ class CostTracker:
 
         # Initialize budget tracking
         self._budget_tracker = BudgetTracker(budgets)
-        
+
         # Log budget creation for audit
         for budget in (budgets or []):
             self._audit.log_budget_created(
@@ -146,13 +146,13 @@ class CostTracker:
         self._rate_limiter = RateLimiter(rate_limits)
 
         # Tag cardinality tracking
-        self._tag_values: Dict[str, set] = {}
+        self._tag_values: dict[str, set] = {}
         self._tag_lock = threading.Lock()
 
         # Last call tracking
         self._last_record: Optional[CostRecord] = None
         self._lock = threading.Lock()
-    
+
     def _increment_metric(self, metric: str, amount: int = 1) -> None:
         """Thread-safe metric increment."""
         with self._metrics_lock:
@@ -162,7 +162,7 @@ class CostTracker:
         self,
         func: Optional[F] = None,
         *,
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
         streaming: bool = False,
         provider: Optional[str] = None,
         model: Optional[str] = None,
@@ -201,7 +201,7 @@ class CostTracker:
     def _wrap_sync(
         self,
         func: F,
-        tags: Optional[Dict[str, str]],
+        tags: Optional[dict[str, str]],
         streaming: bool,
         provider_override: Optional[str],
         model_override: Optional[str],
@@ -244,7 +244,7 @@ class CostTracker:
     def _wrap_async(
         self,
         func: F,
-        tags: Optional[Dict[str, str]],
+        tags: Optional[dict[str, str]],
         streaming: bool,
         provider_override: Optional[str],
         model_override: Optional[str],
@@ -287,7 +287,7 @@ class CostTracker:
     @contextmanager
     def track_context(
         self,
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
         provider: Optional[str] = None,
         model: Optional[str] = None,
     ):
@@ -301,7 +301,7 @@ class CostTracker:
         Note: This context manager doesn't automatically extract usage from
         responses. Use the decorator or manual recording for automatic tracking.
         """
-        start_time = time.time()
+        time.time()
         tags = tags or {}
 
         try:
@@ -312,7 +312,7 @@ class CostTracker:
     def span(
         self,
         name: str,
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
     ) -> Span:
         """
         Create a tracking span for grouping multiple LLM calls.
@@ -338,12 +338,12 @@ class CostTracker:
         model: str,
         input_tokens: int,
         output_tokens: int,
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
         success: bool = True,
         error_type: Optional[str] = None,
         latency_ms: int = 0,
         cached_tokens: int = 0,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> CostRecord:
         """
         Manually record an LLM call.
@@ -364,14 +364,14 @@ class CostTracker:
 
         Returns:
             The created CostRecord
-            
+
         Raises:
             ValueError: If provider or model names are invalid
         """
         # Input validation
         self._validate_identifier(provider, "provider")
         self._validate_identifier(model, "model")
-        
+
         if input_tokens < 0:
             raise ValueError("input_tokens must be >= 0")
         if output_tokens < 0:
@@ -380,7 +380,7 @@ class CostTracker:
             raise ValueError("cached_tokens must be >= 0")
         if latency_ms < 0:
             raise ValueError("latency_ms must be >= 0")
-        
+
         tags = tags or {}
         metadata = metadata or {}
 
@@ -406,7 +406,7 @@ class CostTracker:
         exceeded = self._budget_tracker.check_budget(total_cost, tags)
         for budget, action in exceeded:
             current_spending = self._budget_tracker.get_spending(budget.name)
-            
+
             # Log to audit
             if action == BudgetAction.WARN:
                 self._audit.log_budget_warning(
@@ -502,7 +502,7 @@ class CostTracker:
     def _record_call(
         self,
         response: Any,
-        tags: Optional[Dict[str, str]],
+        tags: Optional[dict[str, str]],
         success: bool,
         error_type: Optional[str],
         latency_ms: int,
@@ -565,20 +565,20 @@ class CostTracker:
     def _handle_tracking_error(self, error: Exception) -> None:
         """
         Handle errors during tracking based on configuration.
-        
+
         Behavior depends on on_tracking_failure setting:
         - "block": Raises TrackingUnavailableError
         - "fallback": Switches to in-memory backend
         - "allow": Logs warning and continues
-        
+
         Args:
             error: The exception that occurred
         """
         self._increment_metric("tracking_errors")
         self._increment_metric("backend_failures")
-        
+
         error_context = f"[backend={self._backend_url}] {type(error).__name__}: {error}"
-        
+
         if self._on_tracking_failure == "block":
             self._audit.log_tracking_failure(error_context, self._backend_url, "blocked")
             logger.error(f"Tracking blocked due to error: {error_context}")
@@ -605,24 +605,24 @@ class CostTracker:
     def _validate_identifier(value: str, name: str) -> None:
         """
         Validate that a value is a valid identifier.
-        
+
         Security: Prevents injection attacks via provider/model names.
-        
+
         Args:
             value: The value to validate
             name: Name of the parameter (for error messages)
-            
+
         Raises:
             ValueError: If the value is not valid
         """
         import re
-        
+
         if not value or not isinstance(value, str):
             raise ValueError(f"{name} must be a non-empty string")
-        
+
         if len(value) > 256:
             raise ValueError(f"{name} must be <= 256 characters")
-        
+
         # Allow common model name patterns: alphanumeric, dash, underscore, dot, colon, slash
         # Examples: gpt-4o, claude-3.5-sonnet, anthropic.claude-v2:1, bedrock/claude
         if not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9_\-\.:/]*$', value):
@@ -631,7 +631,7 @@ class CostTracker:
                 f"alphanumeric, dash, underscore, dot, colon, or slash"
             )
 
-    def _check_tag_cardinality(self, tags: Dict[str, str]) -> None:
+    def _check_tag_cardinality(self, tags: dict[str, str]) -> None:
         """Check and track tag cardinality."""
         with self._tag_lock:
             for key, value in tags.items():
@@ -655,8 +655,8 @@ class CostTracker:
         self,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
-        tags: Optional[Dict[str, str]] = None,
-        group_by: Optional[List[str]] = None,
+        tags: Optional[dict[str, str]] = None,
+        group_by: Optional[list[str]] = None,
     ) -> CostReport:
         """
         Query tracked costs.
@@ -695,7 +695,7 @@ class CostTracker:
         metric: str = "cost",
         granularity: str = "hour",
         last_n_days: int = 7,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get trend analysis for a metric."""
         # This is a simplified implementation
         from datetime import timedelta
@@ -706,7 +706,7 @@ class CostTracker:
         records = self._backend.get_records(start_date=start, end_date=end)
 
         # Group by time bucket
-        buckets: Dict[str, float] = {}
+        buckets: dict[str, float] = {}
         for record in records:
             if granularity == "hour":
                 bucket_key = record.timestamp.strftime("%Y-%m-%d %H:00")
@@ -815,10 +815,10 @@ class CostTracker:
             pricing_last_updated=self._pricing.last_updated,
         )
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """
         Get tracker metrics for observability.
-        
+
         Returns metrics for:
         - backend_failures: Number of backend operation failures
         - fallback_activations: Number of times fallback was activated
@@ -830,14 +830,14 @@ class CostTracker:
         """
         with self._metrics_lock:
             metrics = dict(self._metrics)
-        
+
         metrics["using_fallback"] = self._using_fallback
         metrics["backend_url"] = self._backend_url
-        
+
         # Add backend-specific metrics if available
         if hasattr(self._backend, "get_metrics"):
             metrics["backend_metrics"] = self._backend.get_metrics()
-        
+
         return metrics
 
     @property
@@ -871,7 +871,7 @@ class CostTracker:
         return self._pricing.last_updated
 
     @property
-    def pricing_version(self) -> Dict[str, str]:
+    def pricing_version(self) -> dict[str, str]:
         """Get pricing versions for all providers."""
         return self._pricing.pricing_version
 
